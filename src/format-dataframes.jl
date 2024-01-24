@@ -15,8 +15,9 @@ function format_energy(data_dir::String)
     # read the raw data (energy.bin file)
     energy = readdlm(data_dir * "/energy.bin")
     signs = energy[:,1]
+    nbin = size(signs,1)
     # create a dataframe
-    df = DataFrame(sig = signs, n = energy[:,3]./signs, Ek = energy[:,5]./signs, Edc = energy[:,7]./signs)
+    df = DataFrame(bin = collect(1:nbin), sig = signs, n = energy[:,3]./signs, Ek = energy[:,5]./signs, Edc = energy[:,7]./signs)
     # add metadata
     caption!(df, "energy.bin")
     metadata!(df, "datadir", data_dir)
@@ -48,8 +49,9 @@ function format_pair_onsite_edge(data_dir::String, sigs::Array{Float64,1})
     pair_onsite_edge = readdlm(data_dir * "/pair_onsite_edge.bin")
     pair_onsite_interedges = readdlm(data_dir * "/pair_onsite_interedges.bin")
     pair_onsite_intraedges = readdlm(data_dir * "/pair_onsite_intraedges.bin")
+    nbin = size(sigs,1)
     # create a dataframe
-    df = DataFrame(pair_onsite_edge = pair_onsite_edge[:,1]./sigs, pair_onsite_interedges = pair_onsite_interedges[:,1]./sigs, pair_onsite_intraedges = pair_onsite_intraedges[:,1]./sigs)
+    df = DataFrame(bin = collect(1:nbin), pair_onsite_edge = pair_onsite_edge[:,1]./sigs, pair_onsite_interedges = pair_onsite_interedges[:,1]./sigs, pair_onsite_intraedges = pair_onsite_intraedges[:,1]./sigs)
     # add metadata
     caption!(df, "pair_onsite_edge.bin, pair_onsite_interedges.bin and pair_onsite_intraedges.bin")
     metadata!(df, "datadir", data_dir)
@@ -76,8 +78,9 @@ Format the `pair_onsite_bulk.bin` in `data_dir` into a dataframe and store it in
 function format_pair_onsite_bulk(data_dir::String, sigs::Array{Float64,1})
     # read the raw data (energy.bin file)
     pair_onsite_bulk = readdlm(data_dir * "/pair_onsite_bulk.bin")
+    nbin = size(sigs,1)
     # create a dataframe
-    df = DataFrame(pair_onsite_bulk = pair_onsite_bulk[:,1]./sigs)
+    df = DataFrame(bin = collect(1:nbin), pair_onsite_bulk = pair_onsite_bulk[:,1]./sigs)
     # add metadata
     caption!(df, "pair_onsite_bulk.bin")
     metadata!(df, "datadir", data_dir)
