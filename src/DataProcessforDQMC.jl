@@ -8,5 +8,7 @@ myfunction1(x) = x + 1
 myfunction2(x) = x * 2
 
 include("format-dataframes.jl")
+include("read-dataframes.jl")
+include("statistics.jl")
 
 end
