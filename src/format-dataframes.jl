@@ -145,7 +145,7 @@ function format_pair_onsite_r(data_dir::String, sigs::Array{Float64,1})
     pair_onsite_r = readdlm(data_dir * "/pair_onsite_r.bin")
     # create a dataframe
     nbin = size(sigs,1)
-    nsites = size(pair_onsite_r,1)/nbin
+    nsites = Int(size(pair_onsite_r,1)/nbin)
     df = DataFrame(
         imj_x = pair_onsite_r[:,1], imj_y = pair_onsite_r[:,2], 
         bin = repeat(collect(1:nbin),inner = nsites), 
