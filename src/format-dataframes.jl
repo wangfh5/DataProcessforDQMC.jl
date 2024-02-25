@@ -5,7 +5,69 @@ using TableMetadataTools
 using CSV
 
 export format_energy, format_pair_onsite_edge
-export format_pair_onsite_bulk, format_pair_onsite_r, format_pair_onsite_k
+export format_pair_onsite_bulk, format_pair_onsite_r
+export format_onecol, format_rdata, format_kdata
+
+obs_metadata_dict = Dict(
+    "pair_onsite_edge" => Dict(
+        "label" => L"M_2^{\rm edge}",
+        "note" => "s-wave onsite pairing structure factor for edge sites"
+    ),
+    "pair_onsite_interedges" => Dict(
+        "label" => L"M_2^{\rm interedges}",
+        "note" => "s-wave onsite pairing structure factor for sites at different edges"
+    ),
+    "pair_onsite_intraedges" => Dict(
+        "label" => L"M_2^{\rm intraedges}",
+        "note" => "s-wave onsite pairing structure factor for sites at the same edge"
+    ),
+    "pair_onsite_bulk" => Dict(
+        "label" => L"M_2^{\rm bulk}",
+        "note" => "s-wave onsite pairing structure factor for all sites"
+    ),
+    "pair_onsite_r" => Dict(
+        "label" => L"C_{\Delta}(\mathbf{r}_i-\mathbf{r}_j)",
+        "note" => "s-wave onsite pairing structure factor (depending on the distance between i and j)"
+    ),
+    "pair_onsite_k" => Dict(
+        "label" => L"C_{\Delta}(\mathbf{k})",
+        "note" => "s-wave onsite pairing structure factor in momentum space"
+    ),
+    "nn_r" => Dict(
+        "label" => L"C_{\rm nn}(\mathbf{r}_i-\mathbf{r}_j)",
+        "note" => "density-density correlation function (depending on the distance between i and j)"
+    ),
+    "nn_k" => Dict(
+        "label" => L"C_{\rm nn}(\mathbf{k})",
+        "note" => "density structure factor in momentum space"
+    ),
+    "n" => Dict(
+        "label" => L"\langle n\rangle",
+        "note" => "average occupation number (filling factor) for one sublattice"
+    ),
+    "spsm_r" => Dict(
+        "label" => L"C_{\rm spin}(\mathbf{r}_i-\mathbf{r}_j)=\langle S^+_iS^-_j\rangle",
+        "note" => "spin-spin correlation function (depending on the distance between i and j)"
+    ),
+    "spsm_k" => Dict(
+        "label" => L"C_{\rm spin}(\mathbf{k})",
+        "note" => "spin susceptibility in momentum space"
+    )
+)
+
+"""
+    write_df(df::DataFrame, data_dir::String, dataname::String)
+Write `df` into `data_dir/formatted_data/dataname.csv` and `data_dir/formatted_data/dataname.toml`.
+"""
+function write_df(df::DataFrame, data_dir::String, dataname::String)
+    if !isdir(data_dir * "/formatted_data/")
+        mkdir(data_dir * "/formatted_data/")
+    end
+    CSV.write(data_dir * "/formatted_data/$(dataname).csv", df)
+    open(data_dir * "/formatted_data/$(dataname).toml", "w") do io
+        print(io, meta2toml(df))
+    end
+end
 
 """
     format_energy(data_dir::String)
@@ -30,70 +92,126 @@ function format_energy(data_dir::String)
     label!(df, :Edc, L"\langle H_{U}/U \rangle")
     note!(df, :Edc, "average double-occupation energy")
     # storing metadata persistently
-    if !isdir(data_dir * "/formatted_data/")
-        mkdir(data_dir * "/formatted_data/")
-    end
-    CSV.write(data_dir * "/formatted_data/energy.csv", df)
-    open(data_dir * "/formatted_data/energy.toml", "w") do io
-        print(io, meta2toml(df))
-    end
+    write_df(df, data_dir, "energy")
     return signs
 end
+
+## Generic formatters
+
+"""
+    format_onecol(data_dir::String, sigs::Array{Float64,1}, obsname::String; ifsave::Bool = false)
+A generic formatter for one-column data with each row corresponding to a bin.
+Format the `obsname.bin` in `data_dir` into a dataframe and store it in a `.csv` and `.toml` file.
+In the `.csv` file, the first column is the bin index, and the second column is the value of the observable divided by `sigs`.
+"""
+function format_onecol(data_dir::String, sigs::Array{Float64,1}, obsname::String; ifsave::Bool = false)
+    # read the raw data (energy.bin file)
+    obs = readdlm(data_dir * "/$(obsname).bin")
+    nbin = size(sigs,1)
+    # create a dataframe
+    df = DataFrame(:bin => collect(1:nbin), Symbol(obsname) => obs[:,1]./sigs)
+    # add metadata
+    caption!(df, "$(obsname).bin")
+    metadata!(df, "datadir", data_dir)
+    if haskey(obs_metadata_dict, obsname)
+        label!(df, Symbol(obsname), obs_metadata_dict[obsname]["label"])
+        note!(df, Symbol(obsname), obs_metadata_dict[obsname]["note"])
+    else
+        @warn "No metadata for $(obsname) is found, potentially do not support this measurement."
+    end
+    ifsave ? write_df(df, data_dir, obsname) : return df
+end
+function format_onecol(data_dir::String, sigs::Array{Float64,1}, namelist::Array{String,1}; ifsave::Bool = false)
+    [format_onecol(data_dir, sigs, name; ifsave = ifsave) for name in namelist]
+end
+
+"""
+    format_rdata(data_dir::String, sigs::Array{Float64,1}, obsname::String; ifsave::Bool = false)
+A generic formatter for r-dependent data with each row corresponding to a bin and a spatial position.
+Format the `obsname.bin` in `data_dir` into a dataframe and store it in a `.csv` and `.toml` file.
+For now, only support one sublattice system.
+In the `.csv` file, the first column is the bin index, the second and third columns are the x and y coordinates, and the fourth column is the value of the observable divided by `sigs`.
+"""
+function format_rdata(data_dir::String, sigs::Array{Float64,1}, obsname::String; ifsave::Bool = false)
+    # read the raw data (energy.bin file)
+    obs = readdlm(data_dir * "/$(obsname).bin")
+    nbin = size(sigs,1)
+    nsites = Int(size(obs,1)/nbin)
+    df = DataFrame(
+        :x => obs[:,1], :y => obs[:,2], 
+        :bin => repeat(collect(1:nbin),inner = nsites), 
+        Symbol(obsname) => obs[:,3]./repeat(sigs, inner = nsites))
+    sort!(df,[:x, :y])
+    # add metadata
+    caption!(df, "$(obsname).bin")
+    metadata!(df, "datadir", data_dir)
+    label!(df, :x, L"x/a")
+    note!(df, :x, "x coordinate of unit cell")
+    label!(df, :y, L"y/a")
+    note!(df, :y, "y coordinate of unit cell")
+    if haskey(obs_metadata_dict, obsname)
+        label!(df, Symbol(obsname), obs_metadata_dict[obsname]["label"])
+        note!(df, Symbol(obsname), obs_metadata_dict[obsname]["note"])
+    else
+        @warn "No metadata for $(obsname) is found, potentially do not support this measurement."
+    end
+    ifsave ? write_df(df, data_dir, obsname) : return df
+end
+function format_rdata(data_dir::String, sigs::Array{Float64,1}, namelist::Array{String,1}; ifsave::Bool = false)
+    [format_rdata(data_dir, sigs, name; ifsave = ifsave) for name in namelist]
+end
+
+"""
+    format_kdata(data_dir::String, sigs::Array{Float64,1}, obsname::String; ifsave::Bool = false)
+"""
+function format_kdata(data_dir::String, sigs::Array{Float64,1}, obsname::String; ifsave::Bool = false)
+    # read the raw data (energy.bin file)
+    obs = readdlm(data_dir * "/$(obsname).bin")
+    nbin = size(sigs,1)
+    nsites = Int(size(obs,1)/nbin)
+    df = DataFrame(
+        :kx => obs[:,1], :ky => obs[:,2], 
+        :bin => repeat(collect(1:nbin),inner = nsites), 
+        Symbol(obsname) => obs[:,3]./repeat(sigs, inner = nsites))
+    sort!(df,[:kx, :ky])
+    # add metadata
+    caption!(df, "$(obsname).bin")
+    metadata!(df, "datadir", data_dir)
+    label!(df, :kx, L"k_x/(2\pi/a)")
+    note!(df, :kx, "x component of lattice momentum")
+    label!(df, :ky, L"k_y/(2\pi/a)")
+    note!(df, :ky, "y component of lattice momentum")
+    if haskey(obs_metadata_dict, obsname)
+        label!(df, Symbol(obsname), obs_metadata_dict[obsname]["label"])
+        note!(df, Symbol(obsname), obs_metadata_dict[obsname]["note"])
+    else
+        @warn "No metadata for $(obsname) is found, potentially do not support this measurement."
+    end
+    ifsave ? write_df(df, data_dir, obsname) : return df
+end
+function format_kdata(data_dir::String, sigs::Array{Float64,1}, namelist::Array{String,1}; ifsave::Bool = false)
+    [format_kdata(data_dir, sigs, name; ifsave = ifsave) for name in namelist]
+end
+
+## Specific formatters
 
 """
     format_pair_onsite_edge(data_dir::String, sigs::Array{Float64,1})
 Format the `pair_onsite_edge.bin`, `pair_onsite_interedges.bin` and `pair_onsite_intraedges.bin` in `data_dir` into a dataframe and store it in a `.csv` and `.toml` file.
 """
 function format_pair_onsite_edge(data_dir::String, sigs::Array{Float64,1})
-    # read the raw data (energy.bin file)
-    pair_onsite_edge = readdlm(data_dir * "/pair_onsite_edge.bin")
-    pair_onsite_interedges = readdlm(data_dir * "/pair_onsite_interedges.bin")
-    pair_onsite_intraedges = readdlm(data_dir * "/pair_onsite_intraedges.bin")
-    nbin = size(sigs,1)
-    # create a dataframe
-    df = DataFrame(bin = collect(1:nbin), pair_onsite_edge = pair_onsite_edge[:,1]./sigs, pair_onsite_interedges = pair_onsite_interedges[:,1]./sigs, pair_onsite_intraedges = pair_onsite_intraedges[:,1]./sigs)
-    # add metadata
+    # format each observable
+    pair_onsite_edge = format_onecol(data_dir, sigs, "pair_onsite_edge")
+    pair_onsite_interedges = format_onecol(data_dir, sigs, "pair_onsite_interedges")
+    pair_onsite_intraedges = format_onecol(data_dir, sigs, "pair_onsite_intraedges")
+    # combine them into a single dataframe according to the bin index
+    df = innerjoin(pair_onsite_edge, pair_onsite_interedges, on = :bin)
+    df = innerjoin(df, pair_onsite_intraedges, on = :bin)
+    # add table-level metadata
     caption!(df, "pair_onsite_edge.bin, pair_onsite_interedges.bin and pair_onsite_intraedges.bin")
     metadata!(df, "datadir", data_dir)
-    label!(df, :pair_onsite_edge, L"M_2^{\rm edge}")
-    note!(df, :pair_onsite_edge, "s-wave onsite pairing structure factor for edge sites")
-    label!(df, :pair_onsite_interedges, L"M_2^{\rm interedges}")
-    note!(df, :pair_onsite_interedges, "s-wave onsite pairing structure factor for sites at different edges")
-    label!(df, :pair_onsite_intraedges, L"M_2^{\rm intraedges}")
-    note!(df, :pair_onsite_intraedges, "s-wave onsite pairing structure factor for sites at the same edge")
     # storing metadata persistently
-    if !isdir(data_dir * "/formatted_data/")
-        mkdir(data_dir * "/formatted_data/")
-    end
-    CSV.write(data_dir * "/formatted_data/pair_onsite_edge.csv", df)
-    open(data_dir * "/formatted_data/pair_onsite_edge.toml", "w") do io
-        print(io, meta2toml(df))
-    end
-end
-
-"""
-    format_pair_onsite_bulk(data_dir::String, sigs::Array{Float64,1})
-Format the `pair_onsite_bulk.bin` in `data_dir` into a dataframe and store it in a `.csv` and `.toml` file.
-"""
-function format_pair_onsite_bulk(data_dir::String, sigs::Array{Float64,1})
-    # read the raw data (energy.bin file)
-    pair_onsite_bulk = readdlm(data_dir * "/pair_onsite_bulk.bin")
-    nbin = size(sigs,1)
-    # create a dataframe
-    df = DataFrame(bin = collect(1:nbin), pair_onsite_bulk = pair_onsite_bulk[:,1]./sigs)
-    # add metadata
-    caption!(df, "pair_onsite_bulk.bin")
-    metadata!(df, "datadir", data_dir)
-    label!(df, :pair_onsite_bulk, L"M_2^{\rm bulk}")
-    note!(df, :pair_onsite_bulk, "s-wave onsite pairing structure factor for all sites")
-    # storing metadata persistently
-    if !isdir(data_dir * "/formatted_data/")
-        mkdir(data_dir * "/formatted_data/")
-    end
-    CSV.write(data_dir * "/formatted_data/pair_onsite_bulk.csv", df)
-    open(data_dir * "/formatted_data/pair_onsite_bulk.toml", "w") do io
-        print(io, meta2toml(df))
-    end
+    write_df(df, data_dir, "pair_onsite_edge")
 end
 
 """
@@ -101,6 +219,7 @@ end
 Format the `pair_onsite_r.bin` in `data_dir` into a dataframe and store it in a `.csv` and `.toml` file.
 For now, only support one sublattice system.
 This function support old-fashioned output data, i.e., only output the values without the coordinates, so users need to specify the lattice size `L`.
+Just a compatibility function for old-fashioned output, and will be deprecated in the future.
 """
 function format_pair_onsite_r(data_dir::String, sigs::Array{Float64,1}, L::Int)
     # read the raw data (energy.bin file)
@@ -125,82 +244,5 @@ function format_pair_onsite_r(data_dir::String, sigs::Array{Float64,1}, L::Int)
     label!(df, :pair_onsite_r, L"C_{\Delta}(\mathbf{r}_i-\mathbf{r}_j)")
     note!(df, :pair_onsite_r, "s-wave onsite pairing structure factor (depending on the distance between i and j)")
     # storing metadata persistently
-    if !isdir(data_dir * "/formatted_data/")
-        mkdir(data_dir * "/formatted_data/")
-    end
-    CSV.write(data_dir * "/formatted_data/pair_onsite_r.csv", df)
-    open(data_dir * "/formatted_data/pair_onsite_r.toml", "w") do io
-        print(io, meta2toml(df))
-    end
-end
-
-"""
-    format_pair_onsite_r(data_dir::String, sigs::Array{Float64,1})
-Format the `pair_onsite_r.bin` in `data_dir` into a dataframe and store it in a `.csv` and `.toml` file.
-For now, only support one sublattice system.
-This function support new-fashioned output data, i.e., output both the coordinates and the values in each line.
-"""
-function format_pair_onsite_r(data_dir::String, sigs::Array{Float64,1})
-    # read the raw data (energy.bin file)
-    pair_onsite_r = readdlm(data_dir * "/pair_onsite_r.bin")
-    # create a dataframe
-    nbin = size(sigs,1)
-    nsites = Int(size(pair_onsite_r,1)/nbin)
-    df = DataFrame(
-        imj_x = pair_onsite_r[:,1], imj_y = pair_onsite_r[:,2], 
-        bin = repeat(collect(1:nbin),inner = nsites), 
-        pair_onsite_r = pair_onsite_r[:,3]./repeat(sigs, inner = nsites))
-    sort!(df,[:imj_x, :imj_y])
-    # add metadata
-    caption!(df, "pair_onsite_r.bin")
-    metadata!(df, "datadir", data_dir)
-    label!(df, :imj_x, L"x_i-x_j")
-    note!(df, :imj_x, "x coordinate difference between i and j")
-    label!(df, :imj_y, L"y_i-y_j")
-    note!(df, :imj_y, "y coordinate difference between i and j")
-    label!(df, :pair_onsite_r, L"C_{\Delta}(\mathbf{r}_i-\mathbf{r}_j)")
-    note!(df, :pair_onsite_r, "s-wave onsite pairing structure factor (depending on the distance between i and j)")
-    # storing metadata persistently
-    if !isdir(data_dir * "/formatted_data/")
-        mkdir(data_dir * "/formatted_data/")
-    end
-    CSV.write(data_dir * "/formatted_data/pair_onsite_r.csv", df)
-    open(data_dir * "/formatted_data/pair_onsite_r.toml", "w") do io
-        print(io, meta2toml(df))
-    end
-end
-
-"""
-    format_pair_onsite_k(data_dir::String, sigs::Array{Float64,1})
-Format the `pair_onsite_k.bin` in `data_dir` into a dataframe and store it in a ``.csv` and `.toml` file.
-For now, only support one sublattice system.
-"""
-function format_pair_onsite_k(data_dir::String, sigs::Array{Float64,1})
-    # read the raw data (energy.bin file)
-    pair_onsite_k = readdlm(data_dir * "/pair_onsite_k.bin")
-    # create a dataframe
-    nbin = size(sigs,1)
-    nsites = Int(size(pair_onsite_k,1)/nbin)
-    df = DataFrame(
-        kx = pair_onsite_k[:,1], ky = pair_onsite_k[:,2], 
-        bin = repeat(collect(1:nbin),inner = nsites),
-        pair_onsite_k = pair_onsite_k[:,3]./repeat(sigs, inner = nsites))
-    sort!(df,[:kx, :ky])
-    # add metadata
-    caption!(df, "pair_onsite_k.bin")
-    metadata!(df, "datadir", data_dir)
-    label!(df, :kx, L"k_x")
-    note!(df, :kx, "x component of momentum")
-    label!(df, :ky, L"k_y")
-    note!(df, :ky, "y component of momentum")
-    label!(df, :pair_onsite_k, L"C_{\Delta}(\mathbf{k})")
-    note!(df, :pair_onsite_k, "s-wave onsite pairing structure factor in momentum space")
-    # storing metadata persistently
-    if !isdir(data_dir * "/formatted_data/")
-        mkdir(data_dir * "/formatted_data/")
-    end
-    CSV.write(data_dir * "/formatted_data/pair_onsite_k.csv", df)
-    open(data_dir * "/formatted_data/pair_onsite_k.toml", "w") do io
-        print(io, meta2toml(df))
-    end
+    write_df(df, data_dir, "pair_onsite_r")
 end

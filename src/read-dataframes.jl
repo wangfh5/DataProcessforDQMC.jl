@@ -1,6 +1,6 @@
 export read_format_data
 
-metadata_dict = Dict(
+para_metadata_dict = Dict(
     "U" => Dict("label" => L"U/t", "note" => "Hubbard interaction strength"),
     "Delta_ppm" => Dict("label" => L"\Delta/t", "note" => "p pm ip pairing strength"),
     "mu" => Dict("label" => L"\mu/t", "note" => "chemical potential"),
@@ -51,9 +51,9 @@ will extract `beta`, `U`, `Delta_ppm`, `mu`, `L` and `dtau` from it.
     # if there are many column, can use array and for loop to add columns; or try join tables
     for (i, (key, value)) in enumerate(paras)
         insertcols!(df, i, Symbol(key) => value)
-        if haskey(metadata_dict, key)
-            label!(df, Symbol(key), metadata_dict[key]["label"])
-            note!(df, Symbol(key), metadata_dict[key]["note"])
+        if haskey(para_metadata_dict, key)
+            label!(df, Symbol(key), para_metadata_dict[key]["label"])
+            note!(df, Symbol(key), para_metadata_dict[key]["note"])
         end
     end
     metadata!(df, "npara", length(paras))
