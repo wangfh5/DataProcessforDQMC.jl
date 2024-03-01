@@ -8,6 +8,29 @@ export format_energy, format_pair_onsite_edge
 export format_pair_onsite_bulk, format_pair_onsite_r
 export format_onecol, format_rdata, format_kdata
 
+energy_metadata_dict = Dict(
+    "n" => Dict(
+        "label" => L"\langle n\rangle",
+        "note" => "average occupation number (filling factor)"
+    ),
+    "Ek" => Dict(
+        "label" => L"\langle H_t/t \rangle",
+        "note" => "average hopping energy"
+    ),
+    "Edc" => Dict(
+        "label" => L"\langle H_{U}/U \rangle",
+        "note" => "average double-occupation energy"
+    ),
+    "Eppip" => Dict(
+        "label" => L"E_{p+ip}/t",
+        "note" => "average p+ip pairing energy for spin up"
+    ),
+    "Epmip" => Dict(
+        "label" => L"E_{p-ip}/t",
+        "note" => "average p-ip pairing energy for spin down"
+    )
+)
+
 obs_metadata_dict = Dict(
     "pair_onsite_edge" => Dict(
         "label" => L"M_2^{\rm edge}",
@@ -70,27 +93,34 @@ function write_df(df::DataFrame, data_dir::String, dataname::String)
 end
 
 """
-    format_energy(data_dir::String)
+    format_energy(data_dir::String, energy_list::Array{String,1})
 Format the `energy.bin` in `data_dir` into a dataframe and store it in a `.csv` and `.toml` file.
+The first column of the `energy.bin` must be the sign, and the rest columns are the energy values.
 """
-function format_energy(data_dir::String)
+function format_energy(data_dir::String, energy_list::Array{String,1})
     # read the raw data (energy.bin file)
     energy = readdlm(data_dir * "/energy.bin")
     signs = energy[:,1]
     nbin = size(signs,1)
     # create a dataframe
-    df = DataFrame(bin = collect(1:nbin), sig = signs, n = energy[:,3]./signs, Ek = energy[:,5]./signs, Edc = energy[:,7]./signs)
+    df = DataFrame(bin = collect(1:nbin), sig = signs)
+    # add energy columns
+    for (i,energyname) in enumerate(energy_list)
+        df[!, Symbol(energyname)] = energy[:,2*i+1]./signs
+    end
     # add metadata
     caption!(df, "energy.bin")
     metadata!(df, "datadir", data_dir)
     label!(df, :sig, L"\langle \mathrm{sign} \rangle")
     note!(df, :sig, "average sign")
-    label!(df, :n, L"\langle n\rangle")
-    note!(df, :n, "average occupation number (filling factor)")
-    label!(df, :Ek, L"\langle H_t/t \rangle")
-    note!(df, :Ek, "average hopping energy")
-    label!(df, :Edc, L"\langle H_{U}/U \rangle")
-    note!(df, :Edc, "average double-occupation energy")
+    for energyname in energy_list
+        if haskey(energy_metadata_dict, energyname)
+            label!(df, Symbol(energyname), energy_metadata_dict[energyname]["label"])
+            note!(df, Symbol(energyname), energy_metadata_dict[energyname]["note"])
+        else
+            @warn "No metadata for $(energyname) is found, potentially do not support this measurement."
+        end
+    end
     # storing metadata persistently
     write_df(df, data_dir, "energy")
     return signs
