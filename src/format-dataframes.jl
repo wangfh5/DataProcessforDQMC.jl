@@ -9,6 +9,10 @@ export format_pair_onsite_bulk, format_pair_onsite_r
 export format_onecol, format_rdata, format_kdata
 
 energy_metadata_dict = Dict(
+    "sig" => Dict(
+        "label" => L"\langle \mathrm{sign} \rangle",
+        "note" => "average sign"
+    ),
     "n" => Dict(
         "label" => L"\langle n\rangle",
         "note" => "average occupation number (filling factor)"
@@ -95,24 +99,20 @@ end
 """
     format_energy(data_dir::String, energy_list::Array{String,1})
 Format the `energy.bin` in `data_dir` into a dataframe and store it in a `.csv` and `.toml` file.
-The first column of the `energy.bin` must be the sign, and the rest columns are the energy values.
 """
 function format_energy(data_dir::String, energy_list::Array{String,1})
     # read the raw data (energy.bin file)
     energy = readdlm(data_dir * "/energy.bin")
-    signs = energy[:,1]
-    nbin = size(signs,1)
+    nbin = size(energy, 1)
     # create a dataframe
-    df = DataFrame(bin = collect(1:nbin), sig = signs)
+    df = DataFrame(bin = collect(1:nbin))
     # add energy columns
     for (i,energyname) in enumerate(energy_list)
-        df[!, Symbol(energyname)] = energy[:,2*i+1]./signs
+        df[!, Symbol(energyname)] = energy[:,2*i-1]
     end
     # add metadata
     caption!(df, "energy.bin")
     metadata!(df, "datadir", data_dir)
-    label!(df, :sig, L"\langle \mathrm{sign} \rangle")
-    note!(df, :sig, "average sign")
     for energyname in energy_list
         if haskey(energy_metadata_dict, energyname)
             label!(df, Symbol(energyname), energy_metadata_dict[energyname]["label"])
@@ -123,23 +123,22 @@ function format_energy(data_dir::String, energy_list::Array{String,1})
     end
     # storing metadata persistently
     write_df(df, data_dir, "energy")
-    return signs
 end
 
 ## Generic formatters
 
 """
-    format_onecol(data_dir::String, sigs::Array{Float64,1}, obsname::String; ifsave::Bool = false)
+    format_onecol(data_dir::String, obsname::String; ifsave::Bool = false)
 A generic formatter for one-column data with each row corresponding to a bin.
 Format the `obsname.bin` in `data_dir` into a dataframe and store it in a `.csv` and `.toml` file.
-In the `.csv` file, the first column is the bin index, and the second column is the value of the observable divided by `sigs`.
+In the `.csv` file, the first column is the bin index, and the second column is the value of the observable.
 """
-function format_onecol(data_dir::String, sigs::Array{Float64,1}, obsname::String; ifsave::Bool = false)
-    # read the raw data (energy.bin file)
+function format_onecol(data_dir::String, obsname::String; ifsave::Bool = false)
+    # read the raw data (obsname.bin file)
     obs = readdlm(data_dir * "/$(obsname).bin")
-    nbin = size(sigs,1)
+    nbin = size(obs,1)
     # create a dataframe
-    df = DataFrame(:bin => collect(1:nbin), Symbol(obsname) => obs[:,1]./sigs)
+    df = DataFrame(:bin => collect(1:nbin), Symbol(obsname) => obs[:,1])
     # add metadata
     caption!(df, "$(obsname).bin")
     metadata!(df, "datadir", data_dir)
@@ -151,26 +150,29 @@ function format_onecol(data_dir::String, sigs::Array{Float64,1}, obsname::String
     end
     ifsave ? write_df(df, data_dir, obsname) : return df
 end
-function format_onecol(data_dir::String, sigs::Array{Float64,1}, namelist::Array{String,1}; ifsave::Bool = false)
-    [format_onecol(data_dir, sigs, name; ifsave = ifsave) for name in namelist]
+function format_onecol(data_dir::String, namelist::Array{String,1}; ifsave::Bool = false)
+    [format_onecol(data_dir, name; ifsave = ifsave) for name in namelist]
 end
 
 """
-    format_rdata(data_dir::String, sigs::Array{Float64,1}, obsname::String; ifsave::Bool = false)
+    format_rdata(data_dir::String, obsname::String; ifsave::Bool = false)
 A generic formatter for r-dependent data with each row corresponding to a bin and a spatial position.
 Format the `obsname.bin` in `data_dir` into a dataframe and store it in a `.csv` and `.toml` file.
-For now, only support one sublattice system.
-In the `.csv` file, the first column is the bin index, the second and third columns are the x and y coordinates, and the fourth column is the value of the observable divided by `sigs`.
+For now, only support 2D system with one sublattice.
+In the `.csv` file, the first column is the bin index, the second and third columns are the x and y coordinates, and the fourth column is the value of the observable.
 """
-function format_rdata(data_dir::String, sigs::Array{Float64,1}, obsname::String; ifsave::Bool = false)
-    # read the raw data (energy.bin file)
+function format_rdata(data_dir::String, obsname::String; ifsave::Bool = false)
+    # read the raw data (obsname.bin file)
     obs = readdlm(data_dir * "/$(obsname).bin")
-    nbin = size(sigs,1)
-    nsites = Int(size(obs,1)/nbin)
+    # find the number of bins by the first two columns
+    xy = unique(obs[:,1:2], dims = 1)
+    nsites = size(xy,1)
+    nbin = Int(size(obs,1)/nsites)
+    # create a dataframe
     df = DataFrame(
         :x => obs[:,1], :y => obs[:,2], 
         :bin => repeat(collect(1:nbin),inner = nsites), 
-        Symbol(obsname) => obs[:,3]./repeat(sigs, inner = nsites))
+        Symbol(obsname) => obs[:,3])
     sort!(df,[:x, :y])
     # add metadata
     caption!(df, "$(obsname).bin")
@@ -187,22 +189,28 @@ function format_rdata(data_dir::String, sigs::Array{Float64,1}, obsname::String;
     end
     ifsave ? write_df(df, data_dir, obsname) : return df
 end
-function format_rdata(data_dir::String, sigs::Array{Float64,1}, namelist::Array{String,1}; ifsave::Bool = false)
-    [format_rdata(data_dir, sigs, name; ifsave = ifsave) for name in namelist]
+function format_rdata(data_dir::String, namelist::Array{String,1}; ifsave::Bool = false)
+    [format_rdata(data_dir, name; ifsave = ifsave) for name in namelist]
 end
 
 """
-    format_kdata(data_dir::String, sigs::Array{Float64,1}, obsname::String; ifsave::Bool = false)
+    format_kdata(data_dir::String, obsname::String; ifsave::Bool = false)
 """
-function format_kdata(data_dir::String, sigs::Array{Float64,1}, obsname::String; ifsave::Bool = false)
+function format_kdata(data_dir::String, obsname::String; ifsave::Bool = false)
     # read the raw data (energy.bin file)
     obs = readdlm(data_dir * "/$(obsname).bin")
-    nbin = size(sigs,1)
-    nsites = Int(size(obs,1)/nbin)
+    # find the number of bins by the first two columns
+    kxy = unique(obs[:,1:2], dims = 1)
+    println(kxy)
+    nsites = size(kxy,1)
+    nbin = Int(size(obs,1)/nsites)
+    println(nbin, nsites)
+    # create a dataframe
     df = DataFrame(
         :kx => obs[:,1], :ky => obs[:,2], 
         :bin => repeat(collect(1:nbin),inner = nsites), 
-        Symbol(obsname) => obs[:,3]./repeat(sigs, inner = nsites))
+        Symbol(obsname) => obs[:,3])
+    println(size(df,1))
     sort!(df,[:kx, :ky])
     # add metadata
     caption!(df, "$(obsname).bin")
@@ -219,21 +227,21 @@ function format_kdata(data_dir::String, sigs::Array{Float64,1}, obsname::String;
     end
     ifsave ? write_df(df, data_dir, obsname) : return df
 end
-function format_kdata(data_dir::String, sigs::Array{Float64,1}, namelist::Array{String,1}; ifsave::Bool = false)
-    [format_kdata(data_dir, sigs, name; ifsave = ifsave) for name in namelist]
+function format_kdata(data_dir::String, namelist::Array{String,1}; ifsave::Bool = false)
+    [format_kdata(data_dir, name; ifsave = ifsave) for name in namelist]
 end
 
 ## Specific formatters
 
 """
-    format_pair_onsite_edge(data_dir::String, sigs::Array{Float64,1})
+    format_pair_onsite_edge(data_dir::String)
 Format the `pair_onsite_edge.bin`, `pair_onsite_interedges.bin` and `pair_onsite_intraedges.bin` in `data_dir` into a dataframe and store it in a `.csv` and `.toml` file.
 """
-function format_pair_onsite_edge(data_dir::String, sigs::Array{Float64,1})
+function format_pair_onsite_edge(data_dir::String)
     # format each observable
-    pair_onsite_edge = format_onecol(data_dir, sigs, "pair_onsite_edge")
-    pair_onsite_interedges = format_onecol(data_dir, sigs, "pair_onsite_interedges")
-    pair_onsite_intraedges = format_onecol(data_dir, sigs, "pair_onsite_intraedges")
+    pair_onsite_edge = format_onecol(data_dir, "pair_onsite_edge")
+    pair_onsite_interedges = format_onecol(data_dir, "pair_onsite_interedges")
+    pair_onsite_intraedges = format_onecol(data_dir, "pair_onsite_intraedges")
     # combine them into a single dataframe according to the bin index
     df = innerjoin(pair_onsite_edge, pair_onsite_interedges, on = :bin)
     df = innerjoin(df, pair_onsite_intraedges, on = :bin)
@@ -245,20 +253,20 @@ function format_pair_onsite_edge(data_dir::String, sigs::Array{Float64,1})
 end
 
 """
-    format_pair_onsite_r(data_dir::String, sigs::Array{Float64,1}, L::Int)
+    format_pair_onsite_r(data_dir::String, L::Int)
 Format the `pair_onsite_r.bin` in `data_dir` into a dataframe and store it in a `.csv` and `.toml` file.
 For now, only support one sublattice system.
 This function support old-fashioned output data, i.e., only output the values without the coordinates, so users need to specify the lattice size `L`.
 Just a compatibility function for old-fashioned output, and will be deprecated in the future.
 """
-function format_pair_onsite_r(data_dir::String, sigs::Array{Float64,1}, L::Int)
+function format_pair_onsite_r(data_dir::String, L::Int)
     # read the raw data (energy.bin file)
     pair_onsite_r = readdlm(data_dir * "/pair_onsite_r.bin")
     nbin = Int(size(pair_onsite_r, 1)/(L^2))
     # create a dataframe
     df_tmp = DataFrame()
     for i in 1:nbin
-        insertcols!(df_tmp, i, Symbol(string(i)) => pair_onsite_r[(i-1)*L^2+1:i*L^2,1]./sigs[i])
+        insertcols!(df_tmp, i, Symbol(string(i)) => pair_onsite_r[(i-1)*L^2+1:i*L^2,1])
     end
     # transpose the table
     insertcols!(df_tmp,1, :imj => collect(1:L^2) )
