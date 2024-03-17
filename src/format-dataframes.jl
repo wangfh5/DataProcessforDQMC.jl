@@ -66,11 +66,11 @@ obs_metadata_dict = Dict(
     ),
     "expRenyiN2_2p_edge" => Dict(
         "label" => L"\langle e^{-N_2} \rangle",
-        "note" => "exponential of the two point Renyi negativity among edge sites"
+        "note" => "exponential of the two point Renyi negativity between edge sites"
     ),
-    "expRenyiS2_2p_edge" => Dict(
-        "label" => L"\langle e^{-S_2} \rangle",
-        "note" => "exponential of the two point Renyi entanglement entropy among edge sites"
+    "expRenyiSth_2p_edge" => Dict(
+        "label" => L"\langle e^{-S_2^{\rm th}} \rangle",
+        "note" => "exponential of the two point Renyi entropy between edge sites"
     ),
     "pair_onsite_bulk" => Dict(
         "label" => L"M_2^{\rm bulk}",
