@@ -6,7 +6,7 @@ using CSV
 
 export format_energy, format_pair_onsite_edge
 export format_pair_onsite_bulk, format_pair_onsite_r
-export format_onecol, format_rdata, format_kdata
+export format_onecol, format_rdata, format_kdata, format_edgerdata
 
 energy_metadata_dict = Dict(
     "sig" => Dict(
@@ -32,6 +32,22 @@ energy_metadata_dict = Dict(
     "Epmip" => Dict(
         "label" => L"E_{p-ip}/t",
         "note" => "average p-ip pairing energy for spin down"
+    ),
+    "expRenyiS2_majo" => Dict(
+        "label" => L"\langle e^{-S_2} \rangle",
+        "note" => "average of the exponential of the second Renyi entanglement entropy (using Majorana formula)"
+    ),
+    "expRenyiN2_majo" => Dict(
+        "label" => L"\langle e^{-N_2} \rangle",
+        "note" => "average of the exponential of the second Renyi negativity (using Majorana formula)"
+    ),
+    "expRenyiS2" => Dict(
+        "label" => L"\langle e^{-S_2} \rangle",
+        "note" => "average of the exponential of the second Renyi entanglement entropy (using complex fermion formula)"
+    ),
+    "expRenyiN2" => Dict(
+        "label" => L"\langle e^{-N_2} \rangle",
+        "note" => "average of the exponential of the second Renyi negativity (using complex fermion formula)"
     )
 )
 
@@ -47,6 +63,14 @@ obs_metadata_dict = Dict(
     "pair_onsite_intraedges" => Dict(
         "label" => L"M_2^{\rm intraedges}",
         "note" => "s-wave onsite pairing structure factor for sites at the same edge"
+    ),
+    "expRenyiN2_2p_edge" => Dict(
+        "label" => L"\langle e^{-N_2} \rangle",
+        "note" => "exponential of the two point Renyi negativity among edge sites"
+    ),
+    "expRenyiS2_2p_edge" => Dict(
+        "label" => L"\langle e^{-S_2} \rangle",
+        "note" => "exponential of the two point Renyi entanglement entropy among edge sites"
     ),
     "pair_onsite_bulk" => Dict(
         "label" => L"M_2^{\rm bulk}",
@@ -231,6 +255,42 @@ function format_kdata(data_dir::String, namelist::Array{String,1}; ifsave::Bool 
     [format_kdata(data_dir, name; ifsave = ifsave) for name in namelist]
 end
 
+"""
+    format_edgerdata(data_dir::String, obsname::String; ifsave::Bool = false)
+A generic formatter for r-dependent data along the edge of a cylinder with each row corresponding to a bin and a spatial position. 
+The spatial position is from 1 to L/2, where L is the length of the edge (typically an even number).
+Format the `obsname.bin` in `data_dir` into a dataframe and store it in a `.csv` and `.toml` file.
+In the `.csv` file, the first column is the bin index, the second column is the spatial position, and the third column is the value of the observable.
+"""
+function format_edgerdata(data_dir::String, obsname::String; ifsave::Bool = false)
+    # read the raw data (obsname.bin file)
+    obs = readdlm(data_dir * "/$(obsname).bin")
+    dis = unique(obs[:,1], dims = 1)
+    ndis = size(dis,1)
+    nbin = Int(size(obs,1)/ndis)
+    # create a dataframe
+    df = DataFrame(
+        :r => obs[:,1],
+        :bin => repeat(collect(1:nbin),inner = ndis),
+        Symbol(obsname) => obs[:,2])
+    # add metadata
+    caption!(df, "$(obsname).bin")
+    metadata!(df, "datadir", data_dir)
+    label!(df, :r, L"r/a")
+    note!(df, :r, "two point distance along the edge")
+    if haskey(obs_metadata_dict, obsname)
+        label!(df, Symbol(obsname), obs_metadata_dict[obsname]["label"])
+        note!(df, Symbol(obsname), obs_metadata_dict[obsname]["note"])
+    else
+        @warn "No metadata for $(obsname) is found, potentially do not support this measurement."
+    end
+    ifsave ? write_df(df, data_dir, obsname) : return df
+end
+function format_edgerdata(data_dir::String, namelist::Array{String,1}; ifsave::Bool = false)
+    [format_edgerdata(data_dir, name; ifsave = ifsave) for name in namelist]
+end
+    
+    
 ## Specific formatters
 
 """
