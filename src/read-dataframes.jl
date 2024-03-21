@@ -65,7 +65,7 @@ end
     read_format_data(dataname::String, data_dir::String)
 Read `dataname.csv` and `dataname.toml` in `data_dir`.
 """
-function read_format_data(dataname::String,data_dir::String)
+function read_format_data(dataname::String,data_dir::String;lpara=true)
     # data_dir = "/home/wangfh5/Projects/archieve/majo-ppmip-data/proj_majo_cy.b10.000.U-5.20.Delta_ppm0.4.mu-0.5.L8.dtau0.05/"
     # dataname = "energy"
     # dataname = "pair_onsite_edge"
@@ -75,6 +75,8 @@ function read_format_data(dataname::String,data_dir::String)
     end
     metadata!(tmp_df, "ndata", size(tmp_df, 2)-1)
     setmetadatastyle!(==("ndata"), tmp_df)
-    tmp_df = insert_parameters_cols(tmp_df,data_dir)
+    if lpara
+        tmp_df = insert_parameters_cols(tmp_df,data_dir)
+    end
     tmp_df
 end

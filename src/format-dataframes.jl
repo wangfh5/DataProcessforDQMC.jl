@@ -6,7 +6,7 @@ using CSV
 
 export format_energy, format_pair_onsite_edge
 export format_pair_onsite_bulk, format_pair_onsite_r
-export format_onecol, format_rdata, format_kdata, format_edgerdata
+export format_onecol, format_rdata, format_kdata, format_edgerdata, format_edgerfulldata
 
 energy_metadata_dict = Dict(
     "sig" => Dict(
@@ -288,6 +288,48 @@ function format_edgerdata(data_dir::String, obsname::String; ifsave::Bool = fals
 end
 function format_edgerdata(data_dir::String, namelist::Array{String,1}; ifsave::Bool = false)
     [format_edgerdata(data_dir, name; ifsave = ifsave) for name in namelist]
+end
+
+"""
+    format_edgerfulldata(data_dir::String, obsname::String; ifsave::Bool = false)
+A generic formatter for r-dependent data along the edge of a cylinder with each row corresponding to a bin and a spatial position. 
+Contain all the two-point correlation information between all points along the same edges.
+Format the `obsname.bin` in `data_dir` into a dataframe and store it in a `.csv` and `.toml` file.
+In the `.csv` file, the first column is the bin index, the second column is the edge number, 
+the third column is the starting point i, the fourth column is the distance from i, 
+and the fifth column is the value of the observable.
+"""
+function format_edgerfulldata(data_dir::String, obsname::String; ifsave::Bool = false)
+    # read the raw data (obsname.bin file)
+    obs = readdlm(data_dir * "/$(obsname).bin")
+    pairs = unique(obs[:,1:3], dims = 1)
+    npairs = size(pairs,1)
+    nbin = Int(size(obs,1)/npairs)
+    # create a dataframe
+    df = DataFrame(
+        :bin => repeat(collect(1:nbin),inner = npairs),
+        :edge => obs[:,1],
+        :p1 => obs[:,2], :dis => obs[:,3],
+        Symbol(obsname) => obs[:,4])
+    # add metadata
+    caption!(df, "$(obsname).bin")
+    metadata!(df, "datadir", data_dir)
+    label!(df, :edge, "edge index")
+    note!(df, :edge, "index of the edge, 1 is the bottom edge, 2 is the top edge")
+    label!(df, :p1, L"i")
+    note!(df, :p1, "index of the first point along the edge")
+    label!(df, :dis, L"j")
+    note!(df, :dis, "distance from the first point")
+    if haskey(obs_metadata_dict, obsname)
+        label!(df, Symbol(obsname), obs_metadata_dict[obsname]["label"])
+        note!(df, Symbol(obsname), obs_metadata_dict[obsname]["note"])
+    else
+        @warn "No metadata for $(obsname) is found, potentially do not support this measurement."
+    end
+    ifsave ? write_df(df, data_dir, obsname) : return df
+end
+function format_edgerfulldata(data_dir::String, namelist::Array{String,1}; ifsave::Bool = false)
+    [format_edgerfulldata(data_dir, name; ifsave = ifsave) for name in namelist]
 end
     
     
