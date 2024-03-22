@@ -5,7 +5,7 @@ using TableMetadataTools
 using CSV
 
 export format_energy, format_pair_onsite_edge
-export format_pair_onsite_bulk, format_pair_onsite_r
+export format_pair_onsite_bulk, format_pair_onsite_r, format_expRenyi_2p_edge
 export format_onecol, format_rdata, format_kdata, format_edgerdata, format_edgerfulldata
 
 energy_metadata_dict = Dict(
@@ -352,6 +352,23 @@ function format_pair_onsite_edge(data_dir::String)
     metadata!(df, "datadir", data_dir)
     # storing metadata persistently
     write_df(df, data_dir, "pair_onsite_edge")
+end
+
+"""
+    format_expRenyi_2p_edge(data_dir::String)
+Format the `expRenyiN2_2p_edge.bin` and `expRenyiSth_2p_edge.bin` in `data_dir` into a dataframe and store it in a `.csv` and `.toml` file.
+"""
+function format_expRenyi_2p_edge(datadir::String)
+    # format each observable
+    expRenyiN2_2p_edge = format_edgerfulldata(datadir, "expRenyiN2_2p_edge")
+    expRenyiSth_2p_edge = format_edgerfulldata(datadir, "expRenyiSth_2p_edge")
+    # combine them into a single dataframe according to the bin index
+    df = innerjoin(expRenyiN2_2p_edge, expRenyiSth_2p_edge, on = [:bin, :edge, :p1, :dis])
+    # add table-level metadata
+    caption!(df, "expRenyiN2_2p_edge.bin and expRenyiSth_2p_edge.bin")
+    metadata!(df, "datadir", datadir)
+    # storing metadata persistently
+    write_df(df, datadir, "expRenyi_2p_edge")
 end
 
 """
