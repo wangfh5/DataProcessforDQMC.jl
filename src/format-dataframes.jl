@@ -4,7 +4,7 @@ using DataFrames
 using TableMetadataTools
 using CSV
 
-export format_energy, format_pair_onsite_edge
+export format_energy, format_pair_onsite_alledges
 export format_pair_onsite_bulk, format_pair_onsite_r, format_expRenyi_2p_edge
 export format_onecol, format_rdata, format_kdata, format_edgerdata, format_edgerfulldata
 
@@ -336,22 +336,22 @@ end
 ## Specific formatters
 
 """
-    format_pair_onsite_edge(data_dir::String)
-Format the `pair_onsite_edge.bin`, `pair_onsite_interedges.bin` and `pair_onsite_intraedges.bin` in `data_dir` into a dataframe and store it in a `.csv` and `.toml` file.
+    format_pair_onsite_alledges(data_dir::String)
+Format the `pair_onsite_alledges.bin`, `pair_onsite_interedges.bin` and `pair_onsite_intraedges.bin` in `data_dir` into a dataframe and store it in a `.csv` and `.toml` file.
 """
-function format_pair_onsite_edge(data_dir::String)
+function format_pair_onsite_alledges(data_dir::String)
     # format each observable
-    pair_onsite_edge = format_onecol(data_dir, "pair_onsite_edge")
+    pair_onsite_edge = format_onecol(data_dir, "pair_onsite_alledges")
     pair_onsite_interedges = format_onecol(data_dir, "pair_onsite_interedges")
     pair_onsite_intraedges = format_onecol(data_dir, "pair_onsite_intraedges")
     # combine them into a single dataframe according to the bin index
     df = innerjoin(pair_onsite_edge, pair_onsite_interedges, on = :bin)
     df = innerjoin(df, pair_onsite_intraedges, on = :bin)
     # add table-level metadata
-    caption!(df, "pair_onsite_edge.bin, pair_onsite_interedges.bin and pair_onsite_intraedges.bin")
+    caption!(df, "pair_onsite_alledges.bin, pair_onsite_interedges.bin and pair_onsite_intraedges.bin")
     metadata!(df, "datadir", data_dir)
     # storing metadata persistently
-    write_df(df, data_dir, "pair_onsite_edge")
+    write_df(df, data_dir, "pair_onsite_alledges")
 end
 
 """
