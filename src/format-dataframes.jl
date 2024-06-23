@@ -52,7 +52,7 @@ energy_metadata_dict = Dict(
 )
 
 obs_metadata_dict = Dict(
-    "pair_onsite_edge" => Dict(
+    "pair_onsite_alledges" => Dict(
         "label" => L"M_2^{\rm edge}",
         "note" => "s-wave onsite pairing structure factor for edge sites"
     ),
