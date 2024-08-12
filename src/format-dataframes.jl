@@ -3,6 +3,7 @@ using LaTeXStrings
 using DataFrames
 using TableMetadataTools
 using CSV
+using JLD2
 
 export format_energy, format_pair_onsite_alledges
 export format_pair_onsite_bulk, format_pair_onsite_r, format_expRenyi_2p_edge
@@ -110,13 +111,33 @@ obs_metadata_dict = Dict(
     write_df(df::DataFrame, data_dir::String, dataname::String)
 Write `df` into `data_dir/formatted_data/dataname.csv` and `data_dir/formatted_data/dataname.toml`.
 """
-function write_df(df::DataFrame, data_dir::String, dataname::String)
+function write_df(df::DataFrame, data_dir::String, dataname::String; lmeta::Bool=true, ljld2::Bool=false)
     if !isdir(data_dir * "/formatted_data/")
         mkdir(data_dir * "/formatted_data/")
     end
     CSV.write(data_dir * "/formatted_data/$(dataname).csv", df)
-    open(data_dir * "/formatted_data/$(dataname).toml", "w") do io
-        print(io, meta2toml(df))
+    if lmeta
+        open(data_dir * "/formatted_data/$(dataname).toml", "w") do io
+            print(io, meta2toml(df))
+        end
+    end
+    if ljld2
+        filename = joinpath(data_dir, "formatted_data", "data.jld2")
+        if isfile(filename)
+            # 文件存在，使用r+模式打开并写入新变量
+            jldopen(filename, "r+") do file
+                # 检查并删除同名的旧变量
+                if haskey(file, dataname)
+                    delete!(file, dataname)
+                end
+                file[dataname] = df
+            end
+        else
+            # 文件不存在，使用w模式创建新文件并写入变量
+            jldopen(filename, "w") do file
+                file[dataname] = df
+            end
+        end
     end
 end
 
@@ -145,8 +166,10 @@ function format_energy(data_dir::String, energy_list::Array{String,1})
             @warn "No metadata for $(energyname) is found, potentially do not support this measurement."
         end
     end
-    # storing metadata persistently
-    write_df(df, data_dir, "energy")
+    # calculate the average and error
+    df = statistics_columns(df)
+    # storing the result
+    write_df(df, data_dir, "energy"; lmeta=false, ljld2=true)
 end
 
 ## Generic formatters
@@ -172,7 +195,9 @@ function format_onecol(data_dir::String, obsname::String; ifsave::Bool = false)
     else
         @warn "No metadata for $(obsname) is found, potentially do not support this measurement."
     end
-    ifsave ? write_df(df, data_dir, obsname) : return df
+    # calculate the average and error
+    df = statistics_columns(df)
+    ifsave ? write_df(df, data_dir, obsname; lmeta=false, ljld2=true) : return df
 end
 function format_onecol(data_dir::String, namelist::Array{String,1}; ifsave::Bool = false)
     [format_onecol(data_dir, name; ifsave = ifsave) for name in namelist]
@@ -211,7 +236,9 @@ function format_rdata(data_dir::String, obsname::String; ifsave::Bool = false)
     else
         @warn "No metadata for $(obsname) is found, potentially do not support this measurement."
     end
-    ifsave ? write_df(df, data_dir, obsname) : return df
+    # calculate the average and error
+    df = statistics_columns_withparas(df, paras=[:x, :y])
+    ifsave ? write_df(df, data_dir, obsname; lmeta=false, ljld2=true) : return df
 end
 function format_rdata(data_dir::String, namelist::Array{String,1}; ifsave::Bool = false)
     [format_rdata(data_dir, name; ifsave = ifsave) for name in namelist]
@@ -249,7 +276,9 @@ function format_kdata(data_dir::String, obsname::String; ifsave::Bool = false)
     else
         @warn "No metadata for $(obsname) is found, potentially do not support this measurement."
     end
-    ifsave ? write_df(df, data_dir, obsname) : return df
+    # calculate the average and error
+    df = statistics_columns_withparas(df, paras=[:kx, :ky])
+    ifsave ? write_df(df, data_dir, obsname; lmeta=false, ljld2=true) : return df
 end
 function format_kdata(data_dir::String, namelist::Array{String,1}; ifsave::Bool = false)
     [format_kdata(data_dir, name; ifsave = ifsave) for name in namelist]
