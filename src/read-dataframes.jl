@@ -10,11 +10,9 @@ para_metadata_dict = Dict(
 
 function extract_parameters(str::String)
     # str = "proj_majo_cy.b16.000.U-4.00.Delta_ppm0.4.mu-0.5.L8.dtau0.05"
-    # 使用正则表达式来提取键值对
-    matches = collect(eachmatch(r"([a-zA-Z_]+)-?([\d.-]+)\.?", str))
-    # 将提取的键值对存储到字典中
+    # 使用正则表达式来提取键值对, 将提取的键值对存储到字典中
     dict = Dict{String, Number}()
-    for match in matches
+    for match in eachmatch(r"([a-zA-Z_]+)-?([\d.-]+)\.?", str)
         key = match.captures[1]
         value = match.captures[2]
         # finetune the key name
@@ -27,11 +25,7 @@ function extract_parameters(str::String)
         end
         # 不保存参数值为空的键值对
         if value != ""
-            if occursin(".", value)
-                dict[key] = parse(Float64, value)
-            else
-                dict[key] = parse(Int, value)
-            end
+            dict[key] = occursin(".", value) ? parse(Float64, value) : dict[key] = parse(Int, value)
         end
     end
     dict
