@@ -33,7 +33,7 @@ function RenyiNegativity(filename::String, filedir::String=pwd())
     end
     # @show expRenyiN
     # @show RenyiN
-    return RenyiN
+    return expRenyiN, RenyiN
 end
 
 function RenyiNegativity_all(filedir::String=pwd();maxrank::Int=4)
@@ -51,8 +51,9 @@ function RenyiNegativity_all(filedir::String=pwd();maxrank::Int=4)
             suffix = split(filename, "expRenyiN")[2][1:end-4]
             rank = parse(Int, suffix[1])
             if rank <= maxrank
-                RenyiN = RenyiNegativity(filename, filedir)
+                expRenyiN, RenyiN = RenyiNegativity(filename, filedir)
                 # save the result to a JLD2 file
+                file["expRenyiN$suffix"] = expRenyiN
                 file["RenyiN$suffix"] = RenyiN
             end
         end
