@@ -45,10 +45,10 @@ function RenyiNegativity_all(filedir::String=pwd();maxrank::Int=4)
     nfiles = length(filenames)
     # for each file, create an array to store the average and error of Renyi negativity
     # and then append the result to an opened JLD2 file
-    file = jldopen("RenyiNall.jld2", "a") do file
+    file = jldopen("RenyiNall.jld2", "w") do file
         for i in 1:nfiles
             filename = filenames[i]
-            suffix = split(filename, "expRenyiN")[2]
+            suffix = split(filename, "expRenyiN")[2][1:end-4]
             rank = parse(Int, suffix[1])
             if rank <= maxrank
                 RenyiN = RenyiNegativity(filename, filedir)
