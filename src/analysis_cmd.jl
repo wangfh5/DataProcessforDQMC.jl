@@ -1,7 +1,7 @@
 ## These function accept the filename of the data file and then do analysis
 export RenyiNegativity, RenyiNegativity_all
 
-function RenyiNegativity(filename::String, filedir::String=@__DIR__)
+function RenyiNegativity(filename::String, filedir::String=pwd())
     # 打开文件
     filepath = joinpath(filedir, filename)
 
@@ -36,9 +36,9 @@ function RenyiNegativity(filename::String, filedir::String=@__DIR__)
     return RenyiN
 end
 
-function RenyiNegativity_all(filedir::String=@__DIR__;maxrank::Int=4)
+function RenyiNegativity_all(filedir::String=pwd();maxrank::Int=4)
     # find all the files with name expRenyiN*.bin or expRenyiN*_TW.bin, where * is an integer
-    filenames = filter(x->occursin(r"expRenyiN\d+\.bin", x) || occursin(r"expRenyiN\d+_TW\.bin", x), readdir(filedir))
+    filenames = Base.filter(x->occursin(r"expRenyiN\d+\.bin", x) || occursin(r"expRenyiN\d+_TW\.bin", x), readdir(filedir))
     # sort the filenames
     filenames = sort(filenames)
     # get the number of files
@@ -53,7 +53,7 @@ function RenyiNegativity_all(filedir::String=@__DIR__;maxrank::Int=4)
             if rank <= maxrank
                 RenyiN = RenyiNegativity(filename, filedir)
                 # save the result to a JLD2 file
-                @save file "RenyiN$(suffix)" RenyiN
+                file["RenyiN$suffix"] = RenyiN
             end
         end
     end
