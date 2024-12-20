@@ -1,0 +1,71 @@
+## These function accept the filename of the data file and then do analysis
+export RenyiNegativity, RenyiNegativity_all
+
+function RenyiNegativity(filename::String, filedir::String=@__DIR__)
+    # 打开文件
+    filepath = joinpath(filedir, filename)
+
+    # 使用 readdlm 读取整个文件
+    # 这里假设文件中的数据以空格分隔
+    data = readdlm(filepath, Float64)
+    # remove the first two bin
+    data = data[3:end,:]
+    # remove the max and min
+    data = filter(data, 1)
+
+    # deduce L and rank from the data
+    L = size(data,2) ÷ 2 - 1
+    # example filename: expRenyiN3, expRenyiN4_TW
+    rank = parse(Int, split(filename, "expRenyiN")[2][1])
+
+    # 输出结果
+    expRenyiN = zeros(L+1,2)
+    RenyiN = zeros(L+1,2)
+    for i in 1:L+1
+        vectmp = data[:,2i-1] # take real part
+        if mean(vectmp) > 0.0
+            mn = mean(vectmp)
+            err = std(vectmp)/sqrt(length(vectmp))
+            expRenyiN[i,:] = [mn, err]
+            RenyiN[i,:] = [log(mn)/(1-rank), abs(err/mn/(1-rank))]
+            println("$(i-1) $(expRenyiN[i,:]) $(RenyiN[i,:])")
+        end
+    end
+    # @show expRenyiN
+    # @show RenyiN
+    return RenyiN
+end
+
+function RenyiNegativity_all(filedir::String=@__DIR__;maxrank::Int=4)
+    # find all the files with name expRenyiN*.bin or expRenyiN*_TW.bin, where * is an integer
+    filenames = filter(x->occursin(r"expRenyiN\d+\.bin", x) || occursin(r"expRenyiN\d+_TW\.bin", x), readdir(filedir))
+    # sort the filenames
+    filenames = sort(filenames)
+    # get the number of files
+    nfiles = length(filenames)
+    # for each file, create an array to store the average and error of Renyi negativity
+    # and then append the result to an opened JLD2 file
+    file = jldopen("RenyiNall.jld2", "a") do file
+        for i in 1:nfiles
+            filename = filenames[i]
+            suffix = split(filename, "expRenyiN")[2]
+            rank = parse(Int, suffix[1])
+            if rank <= maxrank
+                RenyiN = RenyiNegativity(filename, filedir)
+                # save the result to a JLD2 file
+                @save file "RenyiN$(suffix)" RenyiN
+            end
+        end
+    end
+end
+
+"""
+Remove the max and min of the data
+"""
+function filter(onecolumndata::Array{Float64,1}, dropnum::Int64=1)
+    onecolumndata_sort = sort(onecolumndata)
+    return onecolumndata_sort[1+dropnum:end-dropnum]
+end
+function filter(multicolumnsdata::Array{Float64,2}, dropnum::Int64=1)
+    return hcat([filter(multicolumnsdata[:,i], dropnum) for i in 1:size(multicolumnsdata,2)]...)
+end
