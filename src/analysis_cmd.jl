@@ -1,7 +1,7 @@
 ## These function accept the filename of the data file and then do analysis
 export RenyiNegativity, RenyiNegativity_all
 
-function RenyiNegativity(filename::String, filedir::String=pwd())
+function RenyiNegativity(filename::String, filedir::String=pwd();printLA=nothing)
     # 打开文件
     filepath = joinpath(filedir, filename)
 
@@ -15,8 +15,9 @@ function RenyiNegativity(filename::String, filedir::String=pwd())
 
     # deduce L and rank from the data
     L = size(data,2) ÷ 2 - 1
-    # example filename: expRenyiN3, expRenyiN4_TW
+    # example filename: expRenyiN3.bin, expRenyiN4_TW.bin
     rank = parse(Int, split(filename, "expRenyiN")[2][1])
+    quantity_name = split(filename, ".bin")[1]
 
     # 输出结果
     expRenyiN = zeros(L+1,2)
@@ -28,7 +29,9 @@ function RenyiNegativity(filename::String, filedir::String=pwd())
             err = std(vectmp)/sqrt(length(vectmp))
             expRenyiN[i,:] = [mn, err]
             RenyiN[i,:] = [log(mn)/(1-rank), abs(err/mn/(1-rank))]
-            println("$(i-1) $(expRenyiN[i,:]) $(RenyiN[i,:])")
+            if (printLA == nothing) || ((i-1) ∈ printLA)
+                println("$(quantity_name) $(i-1) $(expRenyiN[i,:]) $(RenyiN[i,:])")
+            end
         end
     end
     # @show expRenyiN
@@ -36,7 +39,7 @@ function RenyiNegativity(filename::String, filedir::String=pwd())
     return expRenyiN, RenyiN
 end
 
-function RenyiNegativity_all(filedir::String=pwd();maxrank::Int=4)
+function RenyiNegativity_all(filedir::String=pwd();maxrank::Int=4, kwargs...)
     # find all the files with name expRenyiN*.bin or expRenyiN*_TW.bin, where * is an integer
     filenames = Base.filter(x->occursin(r"expRenyiN\d+\.bin", x) || occursin(r"expRenyiN\d+_TW\.bin", x), readdir(filedir))
     # sort the filenames
@@ -51,7 +54,7 @@ function RenyiNegativity_all(filedir::String=pwd();maxrank::Int=4)
             suffix = split(filename, "expRenyiN")[2][1:end-4]
             rank = parse(Int, suffix[1])
             if rank <= maxrank
-                expRenyiN, RenyiN = RenyiNegativity(filename, filedir)
+                expRenyiN, RenyiN = RenyiNegativity(filename, filedir;kwargs...)
                 # save the result to a JLD2 file
                 file["expRenyiN$suffix"] = expRenyiN
                 file["RenyiN$suffix"] = RenyiN
