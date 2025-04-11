@@ -1,17 +1,25 @@
 ## These function accept the filename of the data file and then do analysis
 export RenyiNegativity, RenyiNegativity_all
 
-function RenyiNegativity(filename::String, filedir::String=pwd();printLA=nothing)
+function RenyiNegativity(filename::String, filedir::String=pwd();
+    printLA=nothing, startbin::Int=3, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=1)
+    # Add .bin extension if not present
+    if !endswith(filename, ".bin")
+        filename = filename * ".bin"
+    end
+
     # 打开文件
     filepath = joinpath(filedir, filename)
 
     # 使用 readdlm 读取整个文件
-    # 这里假设文件中的数据以空格分隔
     data = readdlm(filepath, Float64)
-    # remove the first two bin
-    data = data[3:end,:]
+    # Apply start and end bin selection
+    data = data[startbin:end,:]
+    if !isnothing(endbin)
+        data = data[1:endbin,:]
+    end
     # remove the max and min
-    data = filter(data, 1)
+    data = filter(data, dropmaxmin)
 
     # deduce L and rank from the data
     L = size(data,2) ÷ 2 - 1
