@@ -1,5 +1,11 @@
 ## These function accept the filename of the data file and then do analysis
-export RenyiNegativity, RenyiNegativity_all, EnergyAnalysis, CorrelationAnalysis
+export RenyiNegativity, RenyiNegativity_all, EnergyAnalysis, CorrelationAnalysis, MultiOrbitalCorrelationAnalysis
+
+using Printf  # Make sure Printf is imported for @sprintf
+
+## -------------------------------------------------------------------------- ##
+##                              Renyi Negativity                              ##
+## -------------------------------------------------------------------------- ##
 
 function RenyiNegativity(filename::String, filedir::String=pwd();
     printLA=nothing, startbin::Int=3, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=1)
@@ -80,6 +86,10 @@ function RenyiNegativity_all(filedir::String=pwd();maxrank::Int=4, kwargs...)
         end
     end
 end
+
+## -------------------------------------------------------------------------- ##
+##                                   Energy                                   ##
+## -------------------------------------------------------------------------- ##
 
 """
     EnergyAnalysis(filename="energy.bin", filedir=pwd();
@@ -190,7 +200,65 @@ function EnergyAnalysis(filename::String="energy.bin", filedir::String=pwd();
     return results
 end
 
-# Distance functions for correlation analysis
+## -------------------------------------------------------------------------- ##
+##                      Real-space Correlation functions                      ##
+## -------------------------------------------------------------------------- ##
+
+## ---------------- Helper functions for correlation analysis --------------- ##
+
+"""Calculate Euclidean distance between two points"""
+function euclidean_distance(x, y)
+    return sqrt(x^2 + y^2)
+end
+
+"""Calculate i coordinate from imj when j is fixed at (1,1)"""
+function calculate_i_coord(imj_x, imj_y, Lx, Ly)
+    i_x = mod1(1 + imj_x, Lx)  # mod1 ensures result is in range 1:Lx
+    i_y = mod1(1 + imj_y, Ly)  # mod1 ensures result is in range 1:Ly
+    return (i_x, i_y)
+end
+
+"""Format a row for correlation output table"""
+function format_correlation_row(coord, distance, i_coord, real_data, imag_data; col_width=25)
+    coord_str = @sprintf("(%d,%d)", coord[1], coord[2])
+    dist_str = @sprintf("%.3f", distance)
+    i_coord_str = @sprintf("(%d,%d)", i_coord[1], i_coord[2])
+
+    return @sprintf("%-15s %-15s %-15s", coord_str, dist_str, i_coord_str) *
+           " " * lpad(real_data, col_width) *
+           " " * lpad(imag_data, col_width)
+end
+
+"""Format a header for correlation output table"""
+function format_correlation_header(col_width=25)
+    return @sprintf("%-15s %-15s %-15s", "imj", "distance", "i [to j=(1,1)]") *
+           " " * lpad("real part", col_width) *
+           " " * lpad("imag part", col_width)
+end
+
+"""Process correlation data for a single coordinate"""
+function process_correlation_values(values::Vector{Complex{T}}) where T <: AbstractFloat
+    # Extract real and imaginary parts
+    real_values = real.(values)
+    imag_values = imag.(values)
+
+    # Calculate mean for real and imaginary parts
+    mean_real = mean(real_values)
+    mean_imag = mean(imag_values)
+
+    # Calculate error for real and imaginary parts
+    err_real = error(real_values, sigma=1, bessel=true, auto_digits=true)
+    err_imag = error(imag_values, sigma=1, bessel=true, auto_digits=true)
+
+    # Format values with appropriate precision
+    formatted_real, formatted_real_err = format_value_error(mean_real, err_real)
+    formatted_imag, formatted_imag_err = format_value_error(mean_imag, err_imag)
+
+    # Return results as complex numbers and formatted strings
+    return [Complex(mean_real, mean_imag), Complex(err_real, err_imag)],
+           "$(formatted_real) ± $(formatted_real_err)",
+           "$(formatted_imag) ± $(formatted_imag_err)"
+end
 
 """
     CorrelationAnalysis(filename="spsm_r.bin", filedir=pwd();
@@ -254,54 +322,57 @@ function CorrelationAnalysis(filename::String="spsm_r.bin", filedir::String=pwd(
     # Read data
     data = readdlm(filepath, Float64)
 
-    # We will apply bin selection for each imj group separately
-
     # Infer lattice size from data - maximum values of first and second columns
     Lx = Int(maximum(data[:, 1]))
     Ly = Int(maximum(data[:, 2]))
 
+    # Analyze the structure of the data to determine the bin structure
+    nrows = size(data, 1)
+    unique_coords = Set([(Int(data[i,1]), Int(data[i,2])) for i in 1:nrows])
+    n_coords = length(unique_coords)
+    n_bins = nrows ÷ n_coords
+
+    if verbose
+        println("File structure analysis:")
+        println("  Total rows: $nrows")
+        println("  Unique coordinates: $n_coords")
+        println("  Estimated bins: $n_bins")
+    end
+
     # Group data by imj coordinates
     coord_groups = Dict{Tuple{Int,Int}, Vector{Complex{Float64}}}()
 
-    # Process each row
-    for i in 1:size(data, 1)
-        imj_x = Int(data[i, 1])
-        imj_y = Int(data[i, 2])
-        real_val = data[i, real_column]
-        imag_val = data[i, imag_column]
-        value = Complex(real_val, imag_val)
-
-        # Use imj coordinate pair as key
-        key = (imj_x, imj_y)
-
-        # Add value to the appropriate group
-        if haskey(coord_groups, key)
-            push!(coord_groups[key], value)
-        else
-            coord_groups[key] = [value]
-        end
+    # Initialize the coordinate groups
+    for coord in unique_coords
+        coord_groups[coord] = Complex{Float64}[]
     end
 
-    # Apply bin selection and filtering to each group
-    for key in keys(coord_groups)
-        values = coord_groups[key]
+    # Process data based on bin structure
+    if n_bins > 1
+        # Process multi-bin data
+        selected_bins, filtered_bins = process_bins(data, n_bins, n_coords, startbin, endbin, dropmaxmin, real_column, verbose)
 
-        # Apply startbin and endbin selection
-        start_idx = startbin
-        end_idx = isnothing(endbin) ? length(values) : min(endbin, length(values))
+        # Extract values for each coordinate from filtered bins
+        for coord in unique_coords
+            values = extract_coord_values(data, coord, filtered_bins, n_coords, real_column, imag_column)
+            coord_groups[coord] = values
+        end
+    else
+        # We only have one bin - can't do bin selection or filtering
+        if verbose
+            println("Warning: Only one bin found. Cannot perform bin selection or filtering.")
+        end
 
-        if start_idx <= end_idx && start_idx <= length(values)
-            values = values[start_idx:end_idx]
+        # Process each row as a single measurement
+        for i in 1:nrows
+            imj_x = Int(data[i, 1])
+            imj_y = Int(data[i, 2])
+            real_val = data[i, real_column]
+            imag_val = data[i, imag_column]
+            value = Complex(real_val, imag_val)
 
-            # Apply filtering if needed
-            if dropmaxmin > 0
-                values = filter(values, dropmaxmin)
-            end
-
-            coord_groups[key] = values
-        else
-            # Empty group if no valid data after bin selection
-            coord_groups[key] = Complex{Float64}[]
+            key = (imj_x, imj_y)
+            coord_groups[key] = [value]
         end
     end
 
@@ -310,56 +381,33 @@ function CorrelationAnalysis(filename::String="spsm_r.bin", filedir::String=pwd(
 
     # Prepare output table
     if verbose
-        println("\nCorrelation analysis of $filename:")
-        println("----------------------------------------")
-        println("Lattice size: $(Lx)×$(Ly)")
-        println("Total measurements after filtering: $(length(coord_groups[(1,1)]))")
-        println("----------------------------------------")
-        println("imj\t\tdistance\t\ti [to j=(1,1)]\t\treal part\t\timag part")
-        println("----------------------------------------")
+        print_correlation_header(filename, Lx, Ly, n_bins, n_bins > 1 ? length(selected_bins) : 0,
+                               n_bins > 1 ? length(filtered_bins) : 0, dropmaxmin, coord_groups,
+                               startbin, endbin)
     end
 
-    # Sort keys for ordered output (first by distance, then by coordinates)
-    function euclidean_distance(x, y)
-        return sqrt(x^2 + y^2)
-    end
-
+    # Sort coordinates for ordered output
     sorted_keys = sort(collect(keys(coord_groups)),
                       by = k -> (euclidean_distance(k[1], k[2]), k[1], k[2]))
 
+    # Process each coordinate
     for key in sorted_keys
         imj_x, imj_y = key
         values = coord_groups[key]
 
-        # Extract real and imaginary parts
-        real_values = real.(values)
-        imag_values = imag.(values)
+        # Process values and get statistics
+        result, real_data, imag_data = process_correlation_values(values)
+        results[key] = result
 
-        # Calculate mean for real and imaginary parts
-        mean_real = mean(real_values)
-        mean_imag = mean(imag_values)
-
-        # Calculate error for real and imaginary parts
-        err_real = error(real_values, sigma=1, bessel=true, auto_digits=true)
-        err_imag = error(imag_values, sigma=1, bessel=true, auto_digits=true)
-
-        # Store results as complex numbers
-        results[key] = [Complex(mean_real, mean_imag), Complex(err_real, err_imag)]
-
-        # Calculate distance
-        distance = euclidean_distance(imj_x, imj_y)
-
-        # Calculate example i coordinate (when j is fixed at (1,1))
-        # i = j + imj with periodic boundary conditions
-        i_x = mod1(1 + imj_x, Lx)  # mod1 ensures result is in range 1:Lx
-        i_y = mod1(1 + imj_y, Ly)  # mod1 ensures result is in range 1:Ly
-
-        # Format values with appropriate precision
-        formatted_real, formatted_real_err = format_value_error(mean_real, err_real)
-        formatted_imag, formatted_imag_err = format_value_error(mean_imag, err_imag)
-
+        # Print results if verbose
         if verbose
-            println("($imj_x,$imj_y)\t\t$(round(distance, digits=3))\t\t\t($i_x,$i_y)\t\t\t$formatted_real ± $formatted_real_err\t\t$formatted_imag ± $formatted_imag_err")
+            # Calculate distance and i coordinate
+            distance = euclidean_distance(imj_x, imj_y)
+            i_coord = calculate_i_coord(imj_x, imj_y, Lx, Ly)
+
+            # Format and print row
+            row = format_correlation_row((imj_x, imj_y), distance, i_coord, real_data, imag_data)
+            println(row)
         end
     end
 
@@ -368,5 +416,366 @@ function CorrelationAnalysis(filename::String="spsm_r.bin", filedir::String=pwd(
     end
 
     return results
+end
+
+"""Process bins and apply filtering"""
+function process_bins(data, n_bins, n_coords, startbin, endbin, dropmaxmin, real_column, verbose)
+    # First, identify which rows belong to which bin
+    bin_rows = Dict{Int, Vector{Int}}()
+
+    # Assuming coordinates repeat in the same order for each bin
+    for bin_idx in 1:n_bins
+        start_row = (bin_idx - 1) * n_coords + 1
+        end_row = bin_idx * n_coords
+        bin_rows[bin_idx] = collect(start_row:end_row)
+    end
+
+    # Apply bin selection
+    selected_bins = collect(startbin:min(isnothing(endbin) ? n_bins : endbin, n_bins))
+
+    # Apply filtering if needed
+    if dropmaxmin > 0 && length(selected_bins) > 2*dropmaxmin
+        # Sort bins by some metric (e.g., average value across all coordinates)
+        bin_avg_values = Float64[]
+        for bin_idx in selected_bins
+            bin_sum = 0.0
+            for row_idx in bin_rows[bin_idx]
+                bin_sum += data[row_idx, real_column]
+            end
+            push!(bin_avg_values, bin_sum / n_coords)
+        end
+
+        # Sort bins by their average values
+        sorted_indices = sortperm(bin_avg_values)
+
+        # Remove the lowest and highest bins
+        filtered_bins = selected_bins[sorted_indices[(dropmaxmin+1):(end-dropmaxmin)]]
+    else
+        filtered_bins = selected_bins
+    end
+
+    if verbose
+        println("  Selected bins: $(length(selected_bins)) out of $n_bins")
+        println("  Filtered bins: $(length(filtered_bins)) after removing $dropmaxmin max/min")
+    end
+
+    return selected_bins, filtered_bins
+end
+
+"""Extract values for a specific coordinate from filtered bins"""
+function extract_coord_values(data, coord, filtered_bins, n_coords, real_column, imag_column)
+    values = Complex{Float64}[]
+
+    # For each filtered bin, find the row with this coordinate
+    for bin_idx in filtered_bins
+        start_row = (bin_idx - 1) * n_coords + 1
+        end_row = bin_idx * n_coords
+
+        for row_idx in start_row:end_row
+            if (Int(data[row_idx, 1]), Int(data[row_idx, 2])) == coord
+                real_val = data[row_idx, real_column]
+                imag_val = data[row_idx, imag_column]
+                value = Complex(real_val, imag_val)
+                push!(values, value)
+                break  # Found the coordinate in this bin, move to next bin
+            end
+        end
+    end
+
+    return values
+end
+
+"""Print header for correlation analysis results"""
+function print_correlation_header(filename, Lx, Ly, n_bins, selected_bins, filtered_bins, dropmaxmin, coord_groups, startbin=1, endbin=nothing)
+    println("\nCorrelation analysis of $filename:")
+    println("----------------------------------------")
+    println("Lattice size: $(Lx)×$(Ly)")
+
+    # Print information about bins
+    if n_bins > 1
+        # Calculate how many bins were selected before max/min filtering
+        selected_count = min(isnothing(endbin) ? n_bins : endbin, n_bins) - startbin + 1
+
+        # Describe all filtering steps
+        if startbin > 1 || !isnothing(endbin)
+            bin_range = "$startbin-$(isnothing(endbin) ? n_bins : min(endbin, n_bins))"
+            println("Bins: $filtered_bins (selected range $bin_range from $n_bins total, then removed $dropmaxmin max/min)")
+        else
+            println("Bins: $filtered_bins (removed $dropmaxmin max/min from $n_bins total)")
+        end
+    else
+        println("Only one bin found - no filtering applied")
+    end
+
+    # Print table header
+    println("\n----------------------------------------")
+    println(format_correlation_header())
+    println("----------------------------------------")
+end
+
+"""
+    MultiOrbitalCorrelationAnalysis(filename="nn_r.bin", filedir=pwd();
+                                   startbin=1, endbin=nothing, dropmaxmin=1,
+                                   orbital_columns=[(3,4), (5,6), (7,8), (9,10)],
+                                   orbital_labels=["AA", "AB", "BA", "BB"],
+                                   auto_digits=true,
+                                   verbose=true)
+
+Analyze multi-orbital correlation function data files, where each orbital pair has its own
+real and imaginary columns. This is particularly useful for Honeycomb lattice models with
+multiple sublattices (e.g., AA, AB, BA, BB orbitals).
+
+Arguments:
+- `filename`: Name of the correlation file (default: "nn_r.bin")
+- `filedir`: Directory containing the file (default: current directory)
+- `startbin`: First bin to include in analysis (default: 1)
+- `endbin`: Last bin to include in analysis (default: all bins)
+- `dropmaxmin`: Number of maximum and minimum values to drop (default: 1)
+- `orbital_columns`: Array of (real_column, imag_column) tuples for each orbital (default: [(3,4), (5,6), (7,8), (9,10)])
+- `orbital_labels`: Array of labels for each orbital (default: ["AA", "AB", "BA", "BB"])
+- `auto_digits`: Whether to automatically determine significant digits based on error of error (default: true)
+- `verbose`: Whether to print results to console (default: true)
+
+Returns:
+- Dictionary with imj coordinate pairs as keys and a dictionary of orbital results as values,
+  where each orbital result contains [mean, error] arrays with complex numbers
+
+Example:
+```julia
+# Analyze nn_r.bin in current directory with default orbital columns
+results = MultiOrbitalCorrelationAnalysis()
+
+# Access results
+corr_1_1_AA = results[(1,1)]["AA"][1]  # mean value at imj=(1,1) for AA orbital
+corr_1_1_AB = results[(1,1)]["AB"][1]  # mean value at imj=(1,1) for AB orbital
+```
+"""
+function MultiOrbitalCorrelationAnalysis(filename::String="nn_r.bin", filedir::String=pwd();
+                                       startbin::Int=1, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=1,
+                                       orbital_columns::Vector{Tuple{Int,Int}}=[(3,4), (5,6), (7,8), (9,10)],
+                                       orbital_labels::Vector{String}=["AA", "AB", "BA", "BB"],
+                                       auto_digits::Bool=true,
+                                       verbose::Bool=true)
+    # Validate inputs
+    if length(orbital_columns) != length(orbital_labels)
+        error("Number of orbital columns ($(length(orbital_columns))) must match number of labels ($(length(orbital_labels)))")
+    end
+
+    # Add .bin extension if not present
+    if !endswith(filename, ".bin")
+        filename = filename * ".bin"
+    end
+
+    # Open and read the file to check if it exists
+    filepath = joinpath(filedir, filename)
+    if !isfile(filepath)
+        error("File not found: $filepath")
+    end
+
+    # Read data to infer lattice size and provide diagnostic information
+    data = readdlm(filepath, Float64)
+    Lx = Int(maximum(data[:, 1]))
+    Ly = Int(maximum(data[:, 2]))
+
+    # Print diagnostic information if verbose
+    if verbose
+        print_diagnostic_info(data, filename)
+    end
+
+    # Analyze each orbital separately
+    orbital_results = analyze_orbitals(filename, filedir, orbital_columns, orbital_labels,
+                                      startbin, endbin, dropmaxmin, auto_digits)
+
+    # Combine results into a single dictionary
+    combined_results, sorted_coords = combine_orbital_results(orbital_results, orbital_labels)
+
+    # Print combined results if verbose
+    if verbose
+        print_multi_orbital_results(filename, Lx, Ly, data, dropmaxmin, orbital_labels,
+                                   combined_results, sorted_coords, startbin, endbin)
+    end
+
+    return combined_results
+end
+
+# Helper functions for MultiOrbitalCorrelationAnalysis
+
+"""Print diagnostic information about the data file"""
+function print_diagnostic_info(data, filename)
+    println("\nData structure for $filename:")
+    println("----------------------------------------")
+
+    # Determine if the file has a bin structure
+    unique_coords = Set([(data[i,1], data[i,2]) for i in 1:size(data,1)])
+    n_coords = length(unique_coords)
+    n_bins = size(data,1) ÷ n_coords
+
+    println("Lattice size: $(Int(maximum(data[:, 1])))×$(Int(maximum(data[:, 2])))")
+    println("Total rows: $(size(data, 1))")
+    println("Unique coordinates: $n_coords")
+    println("Total bins: $n_bins")
+
+    println("----------------------------------------")
+end
+
+"""Analyze each orbital separately"""
+function analyze_orbitals(filename, filedir, orbital_columns, orbital_labels, startbin, endbin, dropmaxmin, auto_digits)
+    orbital_results = Dict{String, Dict{Tuple{Int,Int}, Vector{Complex{Float64}}}}()
+
+    for (i, (real_col, imag_col)) in enumerate(orbital_columns)
+        orbital_label = orbital_labels[i]
+
+        # Call CorrelationAnalysis for this orbital
+        results = CorrelationAnalysis(filename, filedir;
+                                     startbin=startbin, endbin=endbin, dropmaxmin=dropmaxmin,
+                                     real_column=real_col, imag_column=imag_col,
+                                     auto_digits=auto_digits,
+                                     verbose=false)  # Don't print individual orbital results
+
+        orbital_results[orbital_label] = results
+    end
+
+    return orbital_results
+end
+
+"""Combine results from all orbitals"""
+function combine_orbital_results(orbital_results, orbital_labels)
+    combined_results = Dict{Tuple{Int,Int}, Dict{String, Vector{Complex{Float64}}}}()
+
+    # Get all unique imj coordinates across all orbitals
+    all_coords = Set{Tuple{Int,Int}}()
+    for orbital_result in values(orbital_results)
+        union!(all_coords, keys(orbital_result))
+    end
+
+    # Sort coordinates for ordered output
+    sorted_coords = sort(collect(all_coords),
+                         by = k -> (euclidean_distance(k[1], k[2]), k[1], k[2]))
+
+    # Combine results for each coordinate
+    for coord in sorted_coords
+        combined_results[coord] = Dict{String, Vector{Complex{Float64}}}()
+
+        for orbital_label in orbital_labels
+            if haskey(orbital_results[orbital_label], coord)
+                combined_results[coord][orbital_label] = orbital_results[orbital_label][coord]
+            end
+        end
+    end
+
+    return combined_results, sorted_coords
+end
+
+"""Print results for all orbitals"""
+function print_multi_orbital_results(filename, Lx, Ly, data, dropmaxmin, orbital_labels, combined_results, sorted_coords, startbin=1, endbin=nothing)
+    # Calculate bin information
+    nrows = size(data, 1)
+    unique_coords = Set([(Int(data[i,1]), Int(data[i,2])) for i in 1:size(data,1)])
+    n_coords = length(unique_coords)
+    n_bins = nrows ÷ n_coords
+
+    # Calculate how many bins were selected before max/min filtering
+    selected_count = min(isnothing(endbin) ? n_bins : endbin, n_bins) - startbin + 1
+
+    # Calculate how many bins remain after all filtering
+    filtered_bins = max(1, selected_count - 2 * dropmaxmin)
+
+    # Print header
+    println("\nMulti-orbital correlation analysis of $filename:")
+    println("----------------------------------------")
+    println("Lattice size: $(Lx)×$(Ly)")
+    println("Orbitals analyzed: $(join(orbital_labels, ", "))")
+    # Describe all filtering steps
+    if startbin > 1 || !isnothing(endbin)
+        bin_range = "$startbin-$(isnothing(endbin) ? n_bins : min(endbin, n_bins))"
+        println("Bins: $filtered_bins (selected range $bin_range from $n_bins total, then removed $dropmaxmin max/min)")
+    else
+        println("Bins: $filtered_bins (removed $dropmaxmin max/min from $n_bins total)")
+    end
+
+    # Print detailed results for each orbital
+    print_orbital_details(orbital_labels, combined_results, sorted_coords, Lx, Ly)
+
+    # Print compact summary
+    print_compact_summary(orbital_labels, combined_results, sorted_coords)
+end
+
+"""Print detailed results for each orbital"""
+function print_orbital_details(orbital_labels, combined_results, sorted_coords, Lx, Ly)
+    col_width = 25  # Width for value columns
+
+    for orbital_label in orbital_labels
+        println("\n----------------------------------------")
+        println("Orbital: $(orbital_label)")
+        println("----------------------------------------")
+        println(format_correlation_header())
+        println("----------------------------------------")
+
+        for coord in sorted_coords
+            imj_x, imj_y = coord
+            distance = euclidean_distance(imj_x, imj_y)
+            i_coord = calculate_i_coord(imj_x, imj_y, Lx, Ly)
+
+            if haskey(combined_results[coord], orbital_label)
+                mean_val, err_val = combined_results[coord][orbital_label]
+
+                # Format values with appropriate precision
+                formatted_real, formatted_real_err = format_value_error(real(mean_val), real(err_val))
+                formatted_imag, formatted_imag_err = format_value_error(imag(mean_val), imag(err_val))
+
+                real_data = "$(formatted_real) ± $(formatted_real_err)"
+                imag_data = "$(formatted_imag) ± $(formatted_imag_err)"
+
+                # Format and print row
+                row = format_correlation_row(coord, distance, i_coord, real_data, imag_data)
+                println(row)
+            else
+                # Format and print row with N/A values
+                row = format_correlation_row(coord, distance, i_coord, "N/A", "N/A")
+                println(row)
+            end
+        end
+    end
+end
+
+"""Print compact summary with real parts only"""
+function print_compact_summary(orbital_labels, combined_results, sorted_coords)
+    col_width = 25  # Width for each orbital column
+
+    println("\n----------------------------------------")
+    println("\nCompact summary (real parts only):")
+    println("----------------------------------------")
+
+    # Print header
+    header = @sprintf("%-15s", "imj")
+    for label in orbital_labels
+        header *= " " * lpad(label, col_width)
+    end
+    println(header)
+    println("----------------------------------------")
+
+    # Print each coordinate
+    for coord in sorted_coords
+        imj_x, imj_y = coord
+
+        # Format coordinate
+        coord_str = "($imj_x,$imj_y)"
+        row = @sprintf("%-15s", coord_str)
+
+        # Add each orbital's data
+        for orbital_label in orbital_labels
+            if haskey(combined_results[coord], orbital_label)
+                mean_val, err_val = combined_results[coord][orbital_label]
+                formatted_real, formatted_real_err = format_value_error(real(mean_val), real(err_val))
+                orbital_data = "$(formatted_real) ± $(formatted_real_err)"
+                row *= " " * lpad(orbital_data, col_width)
+            else
+                row *= " " * lpad("N/A", col_width)
+            end
+        end
+        println(row)
+    end
+
+    println("----------------------------------------\n")
 end
 

@@ -96,7 +96,7 @@ function error(data; sigma=1, bessel=true, auto_digits=true)
         err_of_err = std_err / sqrt(2 * (n - 1))
 
         # Use the round_error function to round the result
-        result = round_error(result, err_of_err)
+        result = round_error(result, err_of_err)[1]
     end
 
     return result
@@ -210,16 +210,29 @@ format_value_error(2367.38, 23, 2)      # Returns ("2.367e+03", "0.023e3")
 ```
 """
 function format_value_error(value::Number, error::Number, error_sig_digits::Int=1)
-    
+
     # Step 1: Determine the digits of the error based on its significant digits and error
     # For example
     # - If error = 23456, error_sig_digits = 1, error_digits = - 4;
     # - If error = 23456, error_sig_digits = 2, error_digits = - 4 + 2 - 1 = - 3;
     # - If error = 2.3456, error_sig_digits = 1, error_digits = 0;
     # - If error = 2.3456, error_sig_digits = 3, error_digits = 0 + 3 - 1 = 2;
-    error_order = floor(log10(abs(error)))
-    error_digits = - Int(error_order - error_sig_digits + 1)
-    rounded_error = round(error, RoundUp, sigdigits=error_sig_digits)
+    # Handle the case where error is exactly zero
+    if error == 0.0
+        error_order = 0
+        error_digits = error_sig_digits - 1
+        rounded_error = 0.0
+    else
+        # For non-zero errors, calculate order of magnitude
+        error_order = floor(log10(abs(error)))
+        # Check if error_order is -Inf (can happen with very small numbers due to floating point precision)
+        if isinf(error_order)
+            # Use the smallest representable order for very small numbers
+            error_order = -324  # Approximately the smallest exponent for Float64
+        end
+        error_digits = - Int(error_order - error_sig_digits + 1)
+        rounded_error = round(error, RoundUp, sigdigits=error_sig_digits)
+    end
 
     # Step 2: Round the value to match the precision of the error
     value_digits = error_digits
@@ -230,8 +243,19 @@ function format_value_error(value::Number, error::Number, error_sig_digits::Int=
     # - If value = 2.367, value_digits = 3, value_order = 0, value_sig_digits = 0 + 1 + 3 = 4;
     # - If value = 2367, value_digits = 0, value_order = 3, value_sig_digits = 3 + 1 + 0 = 4;
     # - If value = 2300, value_digits = -2, value_order = 3, value_sig_digits = - 2 + 1 + 3 = 2;
-    value_order = floor(log10(abs(rounded_val)))
-    value_sig_digits = Int(value_order) + 1 + value_digits
+    # - If value = 0, handle as a special case
+    if rounded_val == 0.0  # Exactly zero
+        value_order = 0
+        value_sig_digits = 1 + value_digits
+    else
+        value_order = floor(log10(abs(rounded_val)))
+        # Check if value_order is -Inf (can happen with very small numbers due to floating point precision)
+        if isinf(value_order)
+            # Use the smallest representable order for very small numbers
+            value_order = -324  # Approximately the smallest exponent for Float64
+        end
+        value_sig_digits = Int(value_order) + 1 + value_digits
+    end
 
     # Step 4: Format the value and error as strings in scientific notation
     # For clarity, the exponents are printed to be the same for both values
@@ -242,10 +266,16 @@ function format_value_error(value::Number, error::Number, error_sig_digits::Int=
     # - If value = 2367.38, error = 23, error_sig_digits = 1, then we want 2.37e+03 and 0.03e+03
     # - If value = 2367.38, error = 23, error_sig_digits = 2, then we want 2.367e+03 and 0.023e+03
     val_str = @sprintf("%.*e", value_sig_digits - 1, rounded_val)
-    err_exponent = Int(value_order)
-    err_magnitude = abs(rounded_error) / 10.0^err_exponent
-    rounded_error_format = round(err_magnitude, sigdigits=error_sig_digits)
-    err_str = "$(rounded_error_format)e$(err_exponent)"
+    err_exponent = Int(value_order)  # Safe now because we've handled the zero case above
+
+    # Handle the case where error is effectively zero
+    if rounded_error == 0.0
+        err_str = "0e$(err_exponent)"
+    else
+        err_magnitude = abs(rounded_error) / 10.0^err_exponent
+        rounded_error_format = round(err_magnitude, sigdigits=error_sig_digits)
+        err_str = "$(rounded_error_format)e$(err_exponent)"
+    end
 
     return val_str, err_str
 end
