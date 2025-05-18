@@ -1,15 +1,14 @@
 module DataProcessforDQMC
 
-println("Welcome to DataProcessforDQMC!")
+# Basis statistical functions
+include("statistics.jl")
 
-export myfunction1, myfunction2 # export functions
-# Write your package code here.
-myfunction1(x) = x + 1
-myfunction2(x) = x * 2
-
+# Legacy functions - based on dataframes.jl
 include("format-dataframes.jl")
 include("read-dataframes.jl")
-include("statistics.jl")
-include("analysis_cmd.jl")
 
-end
+# New functions - simple implementation of analysis scripts
+include("single-parameter-analysis.jl")
+include("multiple-parameter-analysis.jl")
+
+end  # module DataProcessforDQMC

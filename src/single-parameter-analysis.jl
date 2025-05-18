@@ -1,7 +1,31 @@
-## These function accept the filename of the data file and then do analysis
-export RenyiNegativity, RenyiNegativity_all, EnergyAnalysis, CorrelationAnalysis, MultiOrbitalCorrelationAnalysis
+#= 
+单参数分析模块 (Single Parameter Analysis)
 
-using Printf  # Make sure Printf is imported for @sprintf
+此模块提供了一组函数，用于分析单个参数文件夹中的DQMC模拟数据。
+通常在模拟输出目录中直接运行，处理该目录下的 .bin 文件。
+
+主要功能:
+- 能量分析 (EnergyAnalysis)
+- 单轨道关联函数分析 (CorrelationAnalysis)
+- 多轨道关联函数分析 (MultiOrbitalCorrelationAnalysis)
+- Renyi负值计算 (RenyiNegativity, RenyiNegativity_all)
+
+使用示例:
+1. 在Julia REPL中:
+   using DataProcessforDQMC
+   EnergyAnalysis("energy.bin", ".")
+
+2. 作为脚本运行:
+   julia -e 'using DataProcessforDQMC; EnergyAnalysis("energy.bin", ".")'
+=#
+
+using Printf
+using Statistics
+using DelimitedFiles
+using LinearAlgebra
+
+export EnergyAnalysis, CorrelationAnalysis, MultiOrbitalCorrelationAnalysis
+export RenyiNegativity, RenyiNegativity_all
 
 ## -------------------------------------------------------------------------- ##
 ##                              Renyi Negativity                              ##
@@ -778,4 +802,3 @@ function print_compact_summary(orbital_labels, combined_results, sorted_coords)
 
     println("----------------------------------------\n")
 end
-
