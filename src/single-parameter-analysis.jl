@@ -22,7 +22,6 @@
 using Printf
 using Statistics
 using DelimitedFiles
-using LinearAlgebra
 
 export EnergyAnalysis, CorrelationAnalysis, MultiOrbitalCorrelationAnalysis
 export RenyiNegativity, RenyiNegativity_all
@@ -117,7 +116,7 @@ end
 
 """
     EnergyAnalysis(filename="energy.bin", filedir=pwd();
-                   startbin=1, endbin=nothing, dropmaxmin=1,
+                   startbin=2, endbin=nothing, dropmaxmin=0,
                    columns=[5,7,9,11], labels=["E_kin", "E_pot", "E_tot", "E_tot^2"],
                    verbose=true)
 
@@ -126,9 +125,9 @@ Analyze energy.bin file and calculate Monte Carlo averages and errors for specif
 Arguments:
 - `filename`: Name of the energy file (default: "energy.bin")
 - `filedir`: Directory containing the file (default: current directory)
-- `startbin`: First bin to include in analysis (default: 1)
+- `startbin`: First bin to include in analysis (default: 2)
 - `endbin`: Last bin to include in analysis (default: all bins)
-- `dropmaxmin`: Number of maximum and minimum values to drop (default: 1)
+- `dropmaxmin`: Number of maximum and minimum values to drop (default: 0)
 - `columns`: Array of column indices to analyze (default: [5,7,9,11])
 - `labels`: Array of labels for the columns (default: ["E_kin", "E_pot", "E_tot", "E_tot^2"])
 - `verbose`: Whether to print results to console (default: true)
@@ -150,7 +149,7 @@ kinetic_error = results["Kinetic"][2]   # error
 ```
 """
 function EnergyAnalysis(filename::String="energy.bin", filedir::String=pwd();
-                       startbin::Int=1, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=1,
+                       startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
                        columns::Vector{Int}=[5,7,9],
                        labels::Vector{String}=["E_kin", "d_occ", "E_tot"],
                        verbose::Bool=true)
@@ -270,15 +269,22 @@ function process_correlation_values(values::Vector{Complex{T}}) where T <: Abstr
     mean_real = mean(real_values)
     mean_imag = mean(imag_values)
 
-    # Calculate error for real and imaginary parts
-    err_real = error(real_values, sigma=1, bessel=true, auto_digits=true)
-    err_imag = error(imag_values, sigma=1, bessel=true, auto_digits=true)
+    # Calculate error for real and imaginary parts (with full precision)
+    # 不使用 auto_digits，保留全精度
+    err_real = error(real_values, sigma=1, bessel=true, auto_digits=false)
+    err_imag = error(imag_values, sigma=1, bessel=true, auto_digits=false)
 
-    # Format values with appropriate precision
-    formatted_real, formatted_real_err = format_value_error(mean_real, err_real)
-    formatted_imag, formatted_imag_err = format_value_error(mean_imag, err_imag)
+    # 为了显示格式化，单独计算格式化后的误差值
+    err_real_formatted = error(real_values, sigma=1, bessel=true, auto_digits=true)
+    err_imag_formatted = error(imag_values, sigma=1, bessel=true, auto_digits=true)
 
-    # Return results as complex numbers and formatted strings
+    # Format values with appropriate precision for display only
+    formatted_real, formatted_real_err = format_value_error(mean_real, err_real_formatted)
+    formatted_imag, formatted_imag_err = format_value_error(mean_imag, err_imag_formatted)
+
+    # Return results: 
+    # 1. 全精度的复数值用于后续计算
+    # 2. 格式化的字符串用于显示
     return [Complex(mean_real, mean_imag), Complex(err_real, err_imag)],
            "$(formatted_real) ± $(formatted_real_err)",
            "$(formatted_imag) ± $(formatted_imag_err)"
@@ -286,7 +292,7 @@ end
 
 """
     CorrelationAnalysis(filename="spsm_r.bin", filedir=pwd();
-                        startbin=1, endbin=nothing, dropmaxmin=1,
+                        startbin=2, endbin=nothing, dropmaxmin=0,
                         real_column=3, imag_column=4,
                         auto_digits=true,
                         verbose=true)
@@ -298,9 +304,9 @@ represent imj coordinates (distance vector between points i and j), and calculat
 Arguments:
 - `filename`: Name of the correlation file (default: "spsm_r.bin")
 - `filedir`: Directory containing the file (default: current directory)
-- `startbin`: First bin to include in analysis (default: 1)
+- `startbin`: First bin to include in analysis (default: 2)
 - `endbin`: Last bin to include in analysis (default: all bins)
-- `dropmaxmin`: Number of maximum and minimum values to drop (default: 1)
+- `dropmaxmin`: Number of maximum and minimum values to drop (default: 0)
 - `real_column`: Column index containing the real part of correlation values (default: 3)
 - `imag_column`: Column index containing the imaginary part of correlation values (default: 4)
 - `auto_digits`: Whether to automatically determine significant digits based on error of error (default: true)
@@ -328,7 +334,7 @@ corr_1_1_imag = imag(corr_1_1)  # imaginary part
 ```
 """
 function CorrelationAnalysis(filename::String="spsm_r.bin", filedir::String=pwd();
-                            startbin::Int=1, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=1,
+                            startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
                             real_column::Int=3, imag_column::Int=4,
                             auto_digits::Bool=true,
                             verbose::Bool=true)
@@ -539,7 +545,7 @@ end
 
 """
     MultiOrbitalCorrelationAnalysis(filename="nn_r.bin", filedir=pwd();
-                                   startbin=1, endbin=nothing, dropmaxmin=1,
+                                   startbin=2, endbin=nothing, dropmaxmin=0,
                                    orbital_columns=[(3,4), (5,6), (7,8), (9,10)],
                                    orbital_labels=["AA", "AB", "BA", "BB"],
                                    auto_digits=true,
@@ -550,11 +556,11 @@ real and imaginary columns. This is particularly useful for Honeycomb lattice mo
 multiple sublattices (e.g., AA, AB, BA, BB orbitals).
 
 Arguments:
-- `filename`: Name of the correlation file (default: "nn_r.bin")
+- `filename`: Name of the multi-orbital correlation file (default: "nn_r.bin")
 - `filedir`: Directory containing the file (default: current directory)
-- `startbin`: First bin to include in analysis (default: 1)
+- `startbin`: First bin to include in analysis (default: 2)
 - `endbin`: Last bin to include in analysis (default: all bins)
-- `dropmaxmin`: Number of maximum and minimum values to drop (default: 1)
+- `dropmaxmin`: Number of maximum and minimum values to drop (default: 0)
 - `orbital_columns`: Array of (real_column, imag_column) tuples for each orbital (default: [(3,4), (5,6), (7,8), (9,10)])
 - `orbital_labels`: Array of labels for each orbital (default: ["AA", "AB", "BA", "BB"])
 - `auto_digits`: Whether to automatically determine significant digits based on error of error (default: true)
@@ -575,7 +581,7 @@ corr_1_1_AB = results[(1,1)]["AB"][1]  # mean value at imj=(1,1) for AB orbital
 ```
 """
 function MultiOrbitalCorrelationAnalysis(filename::String="nn_r.bin", filedir::String=pwd();
-                                       startbin::Int=1, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=1,
+                                       startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
                                        orbital_columns::Vector{Tuple{Int,Int}}=[(3,4), (5,6), (7,8), (9,10)],
                                        orbital_labels::Vector{String}=["AA", "AB", "BA", "BB"],
                                        auto_digits::Bool=true,
