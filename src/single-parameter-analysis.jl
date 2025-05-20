@@ -22,6 +22,7 @@
 using Printf
 using Statistics
 using DelimitedFiles
+using DataFrames
 
 export EnergyAnalysis, CorrelationAnalysis, MultiOrbitalCorrelationAnalysis
 export RenyiNegativity, RenyiNegativity_all
@@ -241,65 +242,342 @@ function calculate_i_coord(imj_x, imj_y, Lx, Ly)
     return (i_x, i_y)
 end
 
-"""Format a row for correlation output table"""
-function format_correlation_row(coord, distance, i_coord, real_data, imag_data; col_width=25)
-    coord_str = @sprintf("(%d,%d)", coord[1], coord[2])
-    dist_str = @sprintf("%.3f", distance)
-    i_coord_str = @sprintf("(%d,%d)", i_coord[1], i_coord[2])
+"""
+    filter_bins(df, startbin, endbin, dropmaxmin, n_bins, verbose)
 
-    return @sprintf("%-15s %-15s %-15s", coord_str, dist_str, i_coord_str) *
-           " " * lpad(real_data, col_width) *
-           " " * lpad(imag_data, col_width)
-end
+Filter bins based on startbin, endbin, and dropmaxmin.
 
-"""Format a header for correlation output table"""
-function format_correlation_header(col_width=25)
-    return @sprintf("%-15s %-15s %-15s", "imj", "distance", "i [to j=(1,1)]") *
-           " " * lpad("real part", col_width) *
-           " " * lpad("imag part", col_width)
-end
+Arguments:
+- `df`: DataFrame containing all bin data
+- `startbin`: First bin to include in analysis
+- `endbin`: Last bin to include in analysis (default: all bins)
+- `dropmaxmin`: Number of maximum and minimum values to drop (default: 0)
+- `n_bins`: Total number of bins
+- `verbose`: Whether to print results to console (default: true)
 
-"""Process correlation data for a single coordinate"""
-function process_correlation_values(values::Vector{Complex{T}}) where T <: AbstractFloat
-    # Extract real and imaginary parts
-    real_values = real.(values)
-    imag_values = imag.(values)
-
-    # Calculate mean for real and imaginary parts
-    mean_real = mean(real_values)
-    mean_imag = mean(imag_values)
-
-    # Calculate error for real and imaginary parts (with full precision)
-    # 不使用 auto_digits，保留全精度
-    err_real = error(real_values, sigma=1, bessel=true, auto_digits=false)
-    err_imag = error(imag_values, sigma=1, bessel=true, auto_digits=false)
-
-    # 为了显示格式化，单独计算格式化后的误差值
-    err_real_formatted = error(real_values, sigma=1, bessel=true, auto_digits=true)
-    err_imag_formatted = error(imag_values, sigma=1, bessel=true, auto_digits=true)
-
-    # Format values with appropriate precision for display only
-    formatted_real, formatted_real_err = format_value_error(mean_real, err_real_formatted)
-    formatted_imag, formatted_imag_err = format_value_error(mean_imag, err_imag_formatted)
-
-    # Return results: 
-    # 1. 全精度的复数值用于后续计算
-    # 2. 格式化的字符串用于显示
-    return [Complex(mean_real, mean_imag), Complex(err_real, err_imag)],
-           "$(formatted_real) ± $(formatted_real_err)",
-           "$(formatted_imag) ± $(formatted_imag_err)"
+Returns:
+- Filtered DataFrame
+"""
+function filter_bins(df, startbin, endbin, dropmaxmin, n_bins, verbose; value_columns=[:real_val])
+    # 选择bin范围
+    if !isnothing(endbin)
+        filtered_df = df[(df.bin .>= startbin) .& (df.bin .<= endbin), :]
+    else
+        filtered_df = df[df.bin .>= startbin, :]
+    end
+    
+    selected_bins = unique(filtered_df.bin)
+    selected_count = length(selected_bins)
+    
+    # 应用max/min过滤（如果需要）
+    if dropmaxmin > 0 && selected_count > 2*dropmaxmin
+        # 检查所有请求的列是否存在
+        valid_columns = [col for col in value_columns if col in propertynames(filtered_df)]
+        
+        if isempty(valid_columns)
+            @warn "None of the specified value_columns exist in the DataFrame. Using first numeric column for filtering."
+            # 找到第一个数值列
+            numeric_cols = [col for col in propertynames(filtered_df) if eltype(filtered_df[!, col]) <: Number && col != :bin]
+            if !isempty(numeric_cols)
+                valid_columns = [first(numeric_cols)]
+            else
+                @error "No numeric columns found for bin filtering"
+                return filtered_df
+            end
+        end
+        
+        # 对每个bin计算所有列的平均值总和
+        bin_avg_df = combine(groupby(filtered_df, :bin)) do group
+            total = 0.0
+            for col in valid_columns
+                total += mean(group[!, col])
+            end
+            (bin=first(group.bin), bin_avg=total)
+        end
+        
+        # 对bin排序
+        sorted_bins = sort(bin_avg_df, :bin_avg).bin
+        valid_bins = sorted_bins[(dropmaxmin+1):(end-dropmaxmin)]
+        
+        # 只保留有效bin的数据
+        filtered_df = Base.filter(row -> row.bin in valid_bins, filtered_df)
+    end
+    
+    if verbose
+        filtered_count = length(unique(filtered_df.bin))
+        
+        # 详细的bin选择和过滤信息
+        if n_bins > 1
+            if startbin > 1 || !isnothing(endbin)
+                bin_range = "$startbin-$(isnothing(endbin) ? n_bins : min(endbin, n_bins))"
+                println("  Selected bins: $selected_count of $n_bins (range: $bin_range)")
+            else
+                println("  Selected bins: $selected_count of $n_bins")
+            end
+            
+            if dropmaxmin > 0
+                println("  Filtered bins: $filtered_count (removed $dropmaxmin max/min values)")
+            else
+                println("  No max/min filtering applied")
+            end
+        end
+    end
+    
+    return filtered_df
 end
 
 """
+    calculate_statistics(df, auto_digits)
+
+Calculate statistics for each coordinate in the DataFrame.
+
+Arguments:
+- `df`: DataFrame containing bin information
+- `auto_digits`: Whether to use automatic precision for error calculation
+
+Returns:
+- DataFrame containing statistics for each coordinate
+"""
+function calculate_statistics(df, auto_digits)
+    # 对每个坐标分组
+    grouped_df = groupby(df, :coord)
+    
+    # 对每个组计算统计量
+    results_df = combine(grouped_df) do group_df
+        values = group_df.complex_val
+        real_values = real.(values)
+        imag_values = imag.(values)
+        
+        # 计算均值
+        mean_real = mean(real_values)
+        mean_imag = mean(imag_values)
+        
+        # 计算全精度误差
+        err_real = error(real_values, sigma=1, bessel=true, auto_digits=false)
+        err_imag = error(imag_values, sigma=1, bessel=true, auto_digits=false)
+        
+        # 计算格式化误差
+        err_real_fmt = error(real_values, sigma=1, bessel=true, auto_digits=auto_digits)
+        err_imag_fmt = error(imag_values, sigma=1, bessel=true, auto_digits=auto_digits)
+        
+        # 格式化显示值
+        formatted_real, formatted_real_err = format_value_error(mean_real, err_real_fmt)
+        formatted_imag, formatted_imag_err = format_value_error(mean_imag, err_imag_fmt)
+        
+        return (
+            # 分开保存实部和虚部用于后续计算
+            mean_real = mean_real,
+            mean_imag = mean_imag,
+            err_real = err_real,
+            err_imag = err_imag,
+            
+            # 格式化值用于显示
+            formatted_real = "$(formatted_real) ± $(formatted_real_err)",
+            formatted_imag = "$(formatted_imag) ± $(formatted_imag_err)",
+            
+            # 坐标信息
+            imj_x = first(group_df.imj_x),
+            imj_y = first(group_df.imj_y)
+        )
+    end
+    
+    # 按imj坐标排序
+    sort!(results_df, [:imj_x, :imj_y])
+    
+    return results_df
+end
+
+
+"""
+    calculate_multi_orbital_statistics(filtered_df, orbital_labels, auto_digits)
+
+Calculate statistics for each coordinate and each orbital in the DataFrame.
+
+Arguments:
+- `filtered_df`: DataFrame containing filtered bin data
+- `orbital_labels`: Array of orbital labels
+- `auto_digits`: Whether to use automatic precision for error calculation
+
+Returns:
+- DataFrame containing statistics for each coordinate and orbital
+"""
+function calculate_statistics_multi_orbital(filtered_df, orbital_labels, auto_digits)
+    # Group by coordinates
+    return combine(groupby(filtered_df, :coord)) do group
+        result = NamedTuple()
+        
+        # Basic coordinate information
+        result = merge(result, (
+            imj_x = first(group.imj_x),
+            imj_y = first(group.imj_y)
+        ))
+        
+        # Process each orbital
+        for orbital in orbital_labels
+            real_col = Symbol("$(orbital)_real")
+            imag_col = Symbol("$(orbital)_imag")
+            
+            real_values = group[!, real_col]
+            imag_values = group[!, imag_col]
+            
+            # Calculate statistics
+            mean_real = mean(real_values)
+            mean_imag = mean(imag_values)
+            
+            # Calculate errors (full precision)
+            err_real = error(real_values, sigma=1, bessel=true, auto_digits=false)
+            err_imag = error(imag_values, sigma=1, bessel=true, auto_digits=false)
+            
+            # Calculate formatted errors for display
+            err_real_fmt = error(real_values, sigma=1, bessel=true, auto_digits=auto_digits)
+            err_imag_fmt = error(imag_values, sigma=1, bessel=true, auto_digits=auto_digits)
+            
+            # Format for display
+            formatted_real, formatted_real_err = format_value_error(mean_real, err_real_fmt)
+            formatted_imag, formatted_imag_err = format_value_error(mean_imag, err_imag_fmt)
+            
+            # Add to result
+            result = merge(result, NamedTuple{
+                (Symbol("$(orbital)_mean_real"),
+                 Symbol("$(orbital)_mean_imag"),
+                 Symbol("$(orbital)_err_real"),
+                 Symbol("$(orbital)_err_imag"),
+                 Symbol("$(orbital)_formatted_real"),
+                 Symbol("$(orbital)_formatted_imag"))
+            }((
+                mean_real,
+                mean_imag,
+                err_real,
+                err_imag,
+                "$(formatted_real) ± $(formatted_real_err)",
+                "$(formatted_imag) ± $(formatted_imag_err)"
+            )))
+        end
+        
+        return result
+    end
+end
+
+"""
+    print_correlation_results(results_df, filename, Lx, Ly, dropmaxmin, startbin, endbin, n_bins)
+
+Print single-orbital correlation analysis results.
+
+Arguments:
+- `results_df`: DataFrame containing analysis results
+- `filename`: Name of the correlation file
+- `Lx`, `Ly`: Lattice dimensions
+- `dropmaxmin`: Number of maximum and minimum values dropped
+- `startbin`, `endbin`: Bin range used
+- `n_bins`: Total number of bins
+"""
+function print_correlation_results(results_df, filename, Lx, Ly, dropmaxmin, startbin, endbin, n_bins)
+    println("\nCorrelation analysis of $filename:")
+    println("----------------------------------------")
+    println("Lattice size: $(Lx)×$(Ly)")
+    
+    # 打印bin信息
+    if n_bins > 1
+        if startbin > 1 || !isnothing(endbin)
+            bin_range = "$startbin-$(isnothing(endbin) ? n_bins : min(endbin, n_bins))"
+            println("Bins: using range $bin_range from $n_bins total, dropped $dropmaxmin max/min values")
+        else
+            println("Bins: dropped $dropmaxmin max/min values from $n_bins total")
+        end
+    else
+        println("Only one bin found - no filtering applied")
+    end
+    
+    # 创建显示用DataFrame
+    display_df = DataFrame(
+        "imj" => [string("(", r.imj_x, ",", r.imj_y, ")") for r in eachrow(results_df)],
+        "distance" => [round(r.distance, digits=3) for r in eachrow(results_df)],
+        "i [to j=(1,1)]" => [string("(", r.i_coord[1], ",", r.i_coord[2], ")") for r in eachrow(results_df)],
+        "real part" => results_df.formatted_real,
+        "imag part" => results_df.formatted_imag
+    )
+    
+    println(display_df)
+    println("----------------------------------------")
+end
+
+"""
+    print_correlation_results_multi_orbital(results_df, filename, Lx, Ly, orbital_labels, dropmaxmin, startbin, endbin, n_bins)
+
+Print multi-orbital correlation analysis results.
+
+Arguments:
+- `results_df`: DataFrame containing analysis results
+- `filename`: Name of the correlation file
+- `Lx`, `Ly`: Lattice dimensions
+- `orbital_labels`: Array of orbital labels
+- `dropmaxmin`: Number of maximum and minimum values dropped
+- `startbin`, `endbin`: Bin range used
+- `n_bins`: Total number of bins
+"""
+function print_correlation_results_multi_orbital(results_df, filename, Lx, Ly, orbital_labels, dropmaxmin, startbin, endbin, n_bins)
+    println("\nMulti-orbital correlation analysis of $filename:")
+    println("----------------------------------------")
+    println("Lattice size: $(Lx)×$(Ly)")
+    println("Orbitals analyzed: $(join(orbital_labels, ", "))")
+    
+    # Print bin information
+    if n_bins > 1
+        if startbin > 1 || !isnothing(endbin)
+            bin_range = "$startbin-$(isnothing(endbin) ? n_bins : min(endbin, n_bins))"
+            println("Bins: using range $bin_range from $n_bins total, dropped $dropmaxmin max/min values")
+        else
+            println("Bins: dropped $dropmaxmin max/min values from $n_bins total")
+        end
+    else
+        println("Only one bin found - no filtering applied")
+    end
+    
+    # Print detailed results for each orbital
+    for orbital in orbital_labels
+        println("\n----------------------------------------")
+        println("Orbital: $orbital")
+        println("----------------------------------------")
+        
+        # Create display DataFrame
+        display_df = DataFrame(
+            "imj" => [string("(", r.imj_x, ",", r.imj_y, ")") for r in eachrow(results_df)],
+            "distance" => [round(r.distance, digits=3) for r in eachrow(results_df)],
+            "i [to j=(1,1)]" => [string("(", r.i_coord[1], ",", r.i_coord[2], ")") for r in eachrow(results_df)],
+            "real part" => results_df[:, "$(orbital)_formatted_real"],
+            "imag part" => results_df[:, "$(orbital)_formatted_imag"]
+        )
+        
+        println(display_df)
+    end
+    
+    # Print compact summary (real parts only)
+    println("\n----------------------------------------")
+    println("Compact summary (real parts only):")
+    println("----------------------------------------")
+    
+    # Build compact table
+    compact_df = DataFrame("imj" => [string("(", r.imj_x, ",", r.imj_y, ")") for r in eachrow(results_df)])
+    
+    for orbital in orbital_labels
+        compact_df[!, orbital] = results_df[:, "$(orbital)_formatted_real"]
+    end
+    
+    println(compact_df)
+    println("----------------------------------------")
+end
+
+# ------------------ Main functions for analysis correlation ----------------- #
+
+"""
     CorrelationAnalysis(filename="spsm_r.bin", filedir=pwd();
-                        startbin=2, endbin=nothing, dropmaxmin=0,
-                        real_column=3, imag_column=4,
-                        auto_digits=true,
-                        verbose=true)
+                       startbin=2, endbin=nothing, dropmaxmin=0,
+                       real_column=3, imag_column=4,
+                       auto_digits=true,
+                       verbose=true)
 
 Analyze correlation function data files like `spsm_r.bin` or `nn_r.bin`, where the first two columns
 represent imj coordinates (distance vector between points i and j), and calculate Monte Carlo averages.
-#TODO for Honeycomb: Add support for honeycomb lattice with multiple sublattices
 
 Arguments:
 - `filename`: Name of the correlation file (default: "spsm_r.bin")
@@ -313,8 +591,14 @@ Arguments:
 - `verbose`: Whether to print results to console (default: true)
 
 Returns:
-- Dictionary with imj coordinate pairs as keys and [mean, error] arrays as values,
-  where both mean and error are complex numbers
+- DataFrame containing the following columns:
+  - `coord`: Tuple of (i,j) coordinates
+  - `imj_x`, `imj_y`: x and y components of the distance vector
+  - `mean_real`, `mean_imag`: Mean values of real and imaginary parts
+  - `err_real`, `err_imag`: Errors of real and imaginary parts
+  - `formatted_real`, `formatted_imag`: Formatted strings of values with errors
+  - `distance`: Euclidean distance from origin
+  - `i_coord`: Absolute coordinates relative to (1,1)
 
 Example:
 ```julia
@@ -324,13 +608,23 @@ results = CorrelationAnalysis()
 # Analyze nn_r.bin with custom columns
 results = CorrelationAnalysis("nn_r.bin", real_column=3, imag_column=4)
 
-# Use automatic determination of significant digits
-results = CorrelationAnalysis(auto_digits=true)
-
 # Access results
-corr_1_1 = results[(1,1)][1]  # mean value at imj=(1,1)
-corr_1_1_real = real(corr_1_1)  # real part
-corr_1_1_imag = imag(corr_1_1)  # imaginary part
+real_part = results[1, :mean_real]      # mean of real part
+imag_part = results[1, :mean_imag]      # mean of imaginary part
+real_err = results[1, :err_real]        # error of real part
+imag_err = results[1, :err_imag]        # error of imaginary part
+
+# Get coordinates and values
+for row in eachrow(results)
+    coord = row.coord
+    real_val = row.mean_real
+    imag_val = row.mean_imag
+    real_e = row.err_real
+    imag_e = row.err_imag
+    # Format as complex number for display
+    complex_val = "(\$real_val ± \$real_e) + (\$imag_val ± \$imag_e)im"
+    println("At \$coord: \$complex_val")
+end
 ```
 """
 function CorrelationAnalysis(filename::String="spsm_r.bin", filedir::String=pwd();
@@ -338,225 +632,93 @@ function CorrelationAnalysis(filename::String="spsm_r.bin", filedir::String=pwd(
                             real_column::Int=3, imag_column::Int=4,
                             auto_digits::Bool=true,
                             verbose::Bool=true)
-    # Add .bin extension if not present
+    # 文件读取和基本验证
     if !endswith(filename, ".bin")
         filename = filename * ".bin"
     end
-
-    # Open and read the file
+    
     filepath = joinpath(filedir, filename)
     if !isfile(filepath)
         error("File not found: $filepath")
     end
-
-    # Read data
-    data = readdlm(filepath, Float64)
-
-    # Infer lattice size from data - maximum values of first and second columns
-    Lx = Int(maximum(data[:, 1]))
-    Ly = Int(maximum(data[:, 2]))
-
-    # Analyze the structure of the data to determine the bin structure
-    nrows = size(data, 1)
-    unique_coords = Set([(Int(data[i,1]), Int(data[i,2])) for i in 1:nrows])
+    
+    # 读取数据
+    data_array = readdlm(filepath, Float64)
+    
+    # 创建DataFrame
+    df = DataFrame(
+        :imj_x => Int.(data_array[:, 1]),
+        :imj_y => Int.(data_array[:, 2]),
+        :real_val => data_array[:, real_column],
+        :imag_val => data_array[:, imag_column]
+    )
+    
+    # 推断格子大小和bin结构
+    Lx = Int(maximum(df.imj_x))
+    Ly = Int(maximum(df.imj_y))
+    
+    # 创建坐标元组列用于分组
+    df.coord = [(x, y) for (x, y) in zip(df.imj_x, df.imj_y)]
+    
+    # 计算bin信息
+    unique_coords = unique(df.coord)
     n_coords = length(unique_coords)
-    n_bins = nrows ÷ n_coords
-
+    n_bins = nrow(df) ÷ n_coords
+    
+    # 添加bin列
+    df.bin = repeat(1:n_bins, inner=n_coords)
+    
+    # 添加复数值列
+    df.complex_val = Complex.(df.real_val, df.imag_val)
+    
+    # 输出数据结构信息
     if verbose
         println("File structure analysis:")
-        println("  Total rows: $nrows")
+        println("  Total rows: $(nrow(df))")
         println("  Unique coordinates: $n_coords")
         println("  Estimated bins: $n_bins")
     end
-
-    # Group data by imj coordinates
-    coord_groups = Dict{Tuple{Int,Int}, Vector{Complex{Float64}}}()
-
-    # Initialize the coordinate groups
-    for coord in unique_coords
-        coord_groups[coord] = Complex{Float64}[]
-    end
-
-    # Process data based on bin structure
-    if n_bins > 1
-        # Process multi-bin data
-        selected_bins, filtered_bins = process_bins(data, n_bins, n_coords, startbin, endbin, dropmaxmin, real_column, verbose)
-
-        # Extract values for each coordinate from filtered bins
-        for coord in unique_coords
-            values = extract_coord_values(data, coord, filtered_bins, n_coords, real_column, imag_column)
-            coord_groups[coord] = values
-        end
+    
+    # 应用bin筛选，对于单轨道数据使用 real_val 和 imag_val 列
+    if dropmaxmin > 0
+        filtered_df = filter_bins(df, startbin, endbin, dropmaxmin, n_bins, verbose, 
+                               value_columns=[:real_val, :imag_val])
     else
-        # We only have one bin - can't do bin selection or filtering
-        if verbose
-            println("Warning: Only one bin found. Cannot perform bin selection or filtering.")
-        end
-
-        # Process each row as a single measurement
-        for i in 1:nrows
-            imj_x = Int(data[i, 1])
-            imj_y = Int(data[i, 2])
-            real_val = data[i, real_column]
-            imag_val = data[i, imag_column]
-            value = Complex(real_val, imag_val)
-
-            key = (imj_x, imj_y)
-            coord_groups[key] = [value]
-        end
+        filtered_df = filter_bins(df, startbin, endbin, dropmaxmin, n_bins, verbose)
     end
-
-    # Calculate statistics for each group
-    results = Dict{Tuple{Int,Int}, Vector{Complex{Float64}}}()
-
-    # Prepare output table
+    
+    # 计算统计结果
+    results_df = calculate_statistics(filtered_df, auto_digits)
+    
+    # 计算额外信息（距离和i坐标）
+    results_df.distance = [euclidean_distance(x, y) for (x, y) in zip(results_df.imj_x, results_df.imj_y)]
+    results_df.i_coord = [calculate_i_coord(x, y, Lx, Ly) for (x, y) in zip(results_df.imj_x, results_df.imj_y)]
+    
+    # 按距离排序
+    sort!(results_df, [:distance, :imj_x, :imj_y])
+    
+    # 打印结果
     if verbose
-        print_correlation_header(filename, Lx, Ly, n_bins, n_bins > 1 ? length(selected_bins) : 0,
-                               n_bins > 1 ? length(filtered_bins) : 0, dropmaxmin, coord_groups,
-                               startbin, endbin)
+        print_correlation_results(results_df, filename, Lx, Ly, dropmaxmin, startbin, endbin, n_bins)
     end
-
-    # Sort coordinates for ordered output
-    sorted_keys = sort(collect(keys(coord_groups)),
-                      by = k -> (euclidean_distance(k[1], k[2]), k[1], k[2]))
-
-    # Process each coordinate
-    for key in sorted_keys
-        imj_x, imj_y = key
-        values = coord_groups[key]
-
-        # Process values and get statistics
-        result, real_data, imag_data = process_correlation_values(values)
-        results[key] = result
-
-        # Print results if verbose
-        if verbose
-            # Calculate distance and i coordinate
-            distance = euclidean_distance(imj_x, imj_y)
-            i_coord = calculate_i_coord(imj_x, imj_y, Lx, Ly)
-
-            # Format and print row
-            row = format_correlation_row((imj_x, imj_y), distance, i_coord, real_data, imag_data)
-            println(row)
-        end
-    end
-
-    if verbose
-        println("----------------------------------------\n")
-    end
-
-    return results
+    
+    return results_df
 end
 
-"""Process bins and apply filtering"""
-function process_bins(data, n_bins, n_coords, startbin, endbin, dropmaxmin, real_column, verbose)
-    # First, identify which rows belong to which bin
-    bin_rows = Dict{Int, Vector{Int}}()
-
-    # Assuming coordinates repeat in the same order for each bin
-    for bin_idx in 1:n_bins
-        start_row = (bin_idx - 1) * n_coords + 1
-        end_row = bin_idx * n_coords
-        bin_rows[bin_idx] = collect(start_row:end_row)
-    end
-
-    # Apply bin selection
-    selected_bins = collect(startbin:min(isnothing(endbin) ? n_bins : endbin, n_bins))
-
-    # Apply filtering if needed
-    if dropmaxmin > 0 && length(selected_bins) > 2*dropmaxmin
-        # Sort bins by some metric (e.g., average value across all coordinates)
-        bin_avg_values = Float64[]
-        for bin_idx in selected_bins
-            bin_sum = 0.0
-            for row_idx in bin_rows[bin_idx]
-                bin_sum += data[row_idx, real_column]
-            end
-            push!(bin_avg_values, bin_sum / n_coords)
-        end
-
-        # Sort bins by their average values
-        sorted_indices = sortperm(bin_avg_values)
-
-        # Remove the lowest and highest bins
-        filtered_bins = selected_bins[sorted_indices[(dropmaxmin+1):(end-dropmaxmin)]]
-    else
-        filtered_bins = selected_bins
-    end
-
-    if verbose
-        println("  Selected bins: $(length(selected_bins)) out of $n_bins")
-        println("  Filtered bins: $(length(filtered_bins)) after removing $dropmaxmin max/min")
-    end
-
-    return selected_bins, filtered_bins
-end
-
-"""Extract values for a specific coordinate from filtered bins"""
-function extract_coord_values(data, coord, filtered_bins, n_coords, real_column, imag_column)
-    values = Complex{Float64}[]
-
-    # For each filtered bin, find the row with this coordinate
-    for bin_idx in filtered_bins
-        start_row = (bin_idx - 1) * n_coords + 1
-        end_row = bin_idx * n_coords
-
-        for row_idx in start_row:end_row
-            if (Int(data[row_idx, 1]), Int(data[row_idx, 2])) == coord
-                real_val = data[row_idx, real_column]
-                imag_val = data[row_idx, imag_column]
-                value = Complex(real_val, imag_val)
-                push!(values, value)
-                break  # Found the coordinate in this bin, move to next bin
-            end
-        end
-    end
-
-    return values
-end
-
-"""Print header for correlation analysis results"""
-function print_correlation_header(filename, Lx, Ly, n_bins, selected_bins, filtered_bins, dropmaxmin, coord_groups, startbin=1, endbin=nothing)
-    println("\nCorrelation analysis of $filename:")
-    println("----------------------------------------")
-    println("Lattice size: $(Lx)×$(Ly)")
-
-    # Print information about bins
-    if n_bins > 1
-        # Calculate how many bins were selected before max/min filtering
-        selected_count = min(isnothing(endbin) ? n_bins : endbin, n_bins) - startbin + 1
-
-        # Describe all filtering steps
-        if startbin > 1 || !isnothing(endbin)
-            bin_range = "$startbin-$(isnothing(endbin) ? n_bins : min(endbin, n_bins))"
-            println("Bins: $filtered_bins (selected range $bin_range from $n_bins total, then removed $dropmaxmin max/min)")
-        else
-            println("Bins: $filtered_bins (removed $dropmaxmin max/min from $n_bins total)")
-        end
-    else
-        println("Only one bin found - no filtering applied")
-    end
-
-    # Print table header
-    println("\n----------------------------------------")
-    println(format_correlation_header())
-    println("----------------------------------------")
-end
 
 """
     MultiOrbitalCorrelationAnalysis(filename="nn_r.bin", filedir=pwd();
-                                   startbin=2, endbin=nothing, dropmaxmin=0,
-                                   orbital_columns=[(3,4), (5,6), (7,8), (9,10)],
-                                   orbital_labels=["AA", "AB", "BA", "BB"],
-                                   auto_digits=true,
-                                   verbose=true)
+                                  startbin=2, endbin=nothing, dropmaxmin=0,
+                                  orbital_columns=[(3,4), (5,6), (7,8), (9,10)],
+                                  orbital_labels=["AA", "AB", "BA", "BB"],
+                                  auto_digits=true,
+                                  verbose=true)
 
 Analyze multi-orbital correlation function data files, where each orbital pair has its own
-real and imaginary columns. This is particularly useful for Honeycomb lattice models with
-multiple sublattices (e.g., AA, AB, BA, BB orbitals).
+real and imaginary columns.
 
 Arguments:
-- `filename`: Name of the multi-orbital correlation file (default: "nn_r.bin")
+- `filename`: Name of the correlation file (default: "nn_r.bin")
 - `filedir`: Directory containing the file (default: current directory)
 - `startbin`: First bin to include in analysis (default: 2)
 - `endbin`: Last bin to include in analysis (default: all bins)
@@ -567,8 +729,7 @@ Arguments:
 - `verbose`: Whether to print results to console (default: true)
 
 Returns:
-- Dictionary with imj coordinate pairs as keys and a dictionary of orbital results as values,
-  where each orbital result contains [mean, error] arrays with complex numbers
+- DataFrame containing statistics for each coordinate and orbital
 
 Example:
 ```julia
@@ -576,235 +737,89 @@ Example:
 results = MultiOrbitalCorrelationAnalysis()
 
 # Access results
-corr_1_1_AA = results[(1,1)]["AA"][1]  # mean value at imj=(1,1) for AA orbital
-corr_1_1_AB = results[(1,1)]["AB"][1]  # mean value at imj=(1,1) for AB orbital
+corr_1_1_AA_real = results[1, :AA_mean_real]  # mean real value at first row for AA orbital
+corr_1_1_AB_imag = results[1, :AB_mean_imag]  # mean imag value at first row for AB orbital
 ```
 """
 function MultiOrbitalCorrelationAnalysis(filename::String="nn_r.bin", filedir::String=pwd();
-                                       startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
-                                       orbital_columns::Vector{Tuple{Int,Int}}=[(3,4), (5,6), (7,8), (9,10)],
-                                       orbital_labels::Vector{String}=["AA", "AB", "BA", "BB"],
-                                       auto_digits::Bool=true,
-                                       verbose::Bool=true)
+                                      startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
+                                      orbital_columns::Vector{Tuple{Int,Int}}=[(3,4), (5,6), (7,8), (9,10)],
+                                      orbital_labels::Vector{String}=["AA", "AB", "BA", "BB"],
+                                      auto_digits::Bool=true,
+                                      verbose::Bool=true)
     # Validate inputs
     if length(orbital_columns) != length(orbital_labels)
-        error("Number of orbital columns ($(length(orbital_columns))) must match number of labels ($(length(orbital_labels)))")
+        error("Number of orbital columns ($(length(orbital_columns))) must match number of orbital labels ($(length(orbital_labels)))")
     end
-
-    # Add .bin extension if not present
+    
+    # File reading and validation
     if !endswith(filename, ".bin")
         filename = filename * ".bin"
     end
-
-    # Open and read the file to check if it exists
+    
     filepath = joinpath(filedir, filename)
     if !isfile(filepath)
         error("File not found: $filepath")
     end
-
-    # Read data to infer lattice size and provide diagnostic information
-    data = readdlm(filepath, Float64)
-    Lx = Int(maximum(data[:, 1]))
-    Ly = Int(maximum(data[:, 2]))
-
-    # Print diagnostic information if verbose
-    if verbose
-        print_diagnostic_info(data, filename)
-    end
-
-    # Analyze each orbital separately
-    orbital_results = analyze_orbitals(filename, filedir, orbital_columns, orbital_labels,
-                                      startbin, endbin, dropmaxmin, auto_digits)
-
-    # Combine results into a single dictionary
-    combined_results, sorted_coords = combine_orbital_results(orbital_results, orbital_labels)
-
-    # Print combined results if verbose
-    if verbose
-        print_multi_orbital_results(filename, Lx, Ly, data, dropmaxmin, orbital_labels,
-                                   combined_results, sorted_coords, startbin, endbin)
-    end
-
-    return combined_results
-end
-
-# Helper functions for MultiOrbitalCorrelationAnalysis
-
-"""Print diagnostic information about the data file"""
-function print_diagnostic_info(data, filename)
-    println("\nData structure for $filename:")
-    println("----------------------------------------")
-
-    # Determine if the file has a bin structure
-    unique_coords = Set([(data[i,1], data[i,2]) for i in 1:size(data,1)])
-    n_coords = length(unique_coords)
-    n_bins = size(data,1) ÷ n_coords
-
-    println("Lattice size: $(Int(maximum(data[:, 1])))×$(Int(maximum(data[:, 2])))")
-    println("Total rows: $(size(data, 1))")
-    println("Unique coordinates: $n_coords")
-    println("Total bins: $n_bins")
-
-    println("----------------------------------------")
-end
-
-"""Analyze each orbital separately"""
-function analyze_orbitals(filename, filedir, orbital_columns, orbital_labels, startbin, endbin, dropmaxmin, auto_digits)
-    orbital_results = Dict{String, Dict{Tuple{Int,Int}, Vector{Complex{Float64}}}}()
-
+    
+    # Read data
+    data_array = readdlm(filepath, Float64)
+    
+    # Create base DataFrame
+    df = DataFrame(
+        :imj_x => Int.(data_array[:, 1]),
+        :imj_y => Int.(data_array[:, 2])
+    )
+    
+    # Add columns for each orbital
     for (i, (real_col, imag_col)) in enumerate(orbital_columns)
-        orbital_label = orbital_labels[i]
-
-        # Call CorrelationAnalysis for this orbital
-        results = CorrelationAnalysis(filename, filedir;
-                                     startbin=startbin, endbin=endbin, dropmaxmin=dropmaxmin,
-                                     real_column=real_col, imag_column=imag_col,
-                                     auto_digits=auto_digits,
-                                     verbose=false)  # Don't print individual orbital results
-
-        orbital_results[orbital_label] = results
+        orbital = orbital_labels[i]
+        df[!, Symbol("$(orbital)_real")] = data_array[:, real_col]
+        df[!, Symbol("$(orbital)_imag")] = data_array[:, imag_col]
     end
-
-    return orbital_results
-end
-
-"""Combine results from all orbitals"""
-function combine_orbital_results(orbital_results, orbital_labels)
-    combined_results = Dict{Tuple{Int,Int}, Dict{String, Vector{Complex{Float64}}}}()
-
-    # Get all unique imj coordinates across all orbitals
-    all_coords = Set{Tuple{Int,Int}}()
-    for orbital_result in values(orbital_results)
-        union!(all_coords, keys(orbital_result))
-    end
-
-    # Sort coordinates for ordered output
-    sorted_coords = sort(collect(all_coords),
-                         by = k -> (euclidean_distance(k[1], k[2]), k[1], k[2]))
-
-    # Combine results for each coordinate
-    for coord in sorted_coords
-        combined_results[coord] = Dict{String, Vector{Complex{Float64}}}()
-
-        for orbital_label in orbital_labels
-            if haskey(orbital_results[orbital_label], coord)
-                combined_results[coord][orbital_label] = orbital_results[orbital_label][coord]
-            end
-        end
-    end
-
-    return combined_results, sorted_coords
-end
-
-"""Print results for all orbitals"""
-function print_multi_orbital_results(filename, Lx, Ly, data, dropmaxmin, orbital_labels, combined_results, sorted_coords, startbin=1, endbin=nothing)
+    
+    # Add coordinate and bin information
+    Lx = Int(maximum(df.imj_x))
+    Ly = Int(maximum(df.imj_y))
+    df.coord = [(x, y) for (x, y) in zip(df.imj_x, df.imj_y)]
+    
     # Calculate bin information
-    nrows = size(data, 1)
-    unique_coords = Set([(Int(data[i,1]), Int(data[i,2])) for i in 1:size(data,1)])
+    unique_coords = unique(df.coord)
     n_coords = length(unique_coords)
-    n_bins = nrows ÷ n_coords
-
-    # Calculate how many bins were selected before max/min filtering
-    selected_count = min(isnothing(endbin) ? n_bins : endbin, n_bins) - startbin + 1
-
-    # Calculate how many bins remain after all filtering
-    filtered_bins = max(1, selected_count - 2 * dropmaxmin)
-
-    # Print header
-    println("\nMulti-orbital correlation analysis of $filename:")
-    println("----------------------------------------")
-    println("Lattice size: $(Lx)×$(Ly)")
-    println("Orbitals analyzed: $(join(orbital_labels, ", "))")
-    # Describe all filtering steps
-    if startbin > 1 || !isnothing(endbin)
-        bin_range = "$startbin-$(isnothing(endbin) ? n_bins : min(endbin, n_bins))"
-        println("Bins: $filtered_bins (selected range $bin_range from $n_bins total, then removed $dropmaxmin max/min)")
-    else
-        println("Bins: $filtered_bins (removed $dropmaxmin max/min from $n_bins total)")
+    n_bins = nrow(df) ÷ n_coords
+    df.bin = repeat(1:n_bins, inner=n_coords)
+    
+    # Print data structure info
+    if verbose
+        println("File structure analysis:")
+        println("  Total rows: $(nrow(df))")
+        println("  Unique coordinates: $n_coords")
+        println("  Estimated bins: $n_bins")
     end
-
-    # Print detailed results for each orbital
-    print_orbital_details(orbital_labels, combined_results, sorted_coords, Lx, Ly)
-
-    # Print compact summary
-    print_compact_summary(orbital_labels, combined_results, sorted_coords)
-end
-
-"""Print detailed results for each orbital"""
-function print_orbital_details(orbital_labels, combined_results, sorted_coords, Lx, Ly)
-    col_width = 25  # Width for value columns
-
-    for orbital_label in orbital_labels
-        println("\n----------------------------------------")
-        println("Orbital: $(orbital_label)")
-        println("----------------------------------------")
-        println(format_correlation_header())
-        println("----------------------------------------")
-
-        for coord in sorted_coords
-            imj_x, imj_y = coord
-            distance = euclidean_distance(imj_x, imj_y)
-            i_coord = calculate_i_coord(imj_x, imj_y, Lx, Ly)
-
-            if haskey(combined_results[coord], orbital_label)
-                mean_val, err_val = combined_results[coord][orbital_label]
-
-                # Format values with appropriate precision
-                formatted_real, formatted_real_err = format_value_error(real(mean_val), real(err_val))
-                formatted_imag, formatted_imag_err = format_value_error(imag(mean_val), imag(err_val))
-
-                real_data = "$(formatted_real) ± $(formatted_real_err)"
-                imag_data = "$(formatted_imag) ± $(formatted_imag_err)"
-
-                # Format and print row
-                row = format_correlation_row(coord, distance, i_coord, real_data, imag_data)
-                println(row)
-            else
-                # Format and print row with N/A values
-                row = format_correlation_row(coord, distance, i_coord, "N/A", "N/A")
-                println(row)
-            end
-        end
+    
+    # Apply bin filtering with all orbital columns
+    value_columns = Symbol[]
+    for orbital in orbital_labels
+        push!(value_columns, Symbol("$(orbital)_real"))
+        push!(value_columns, Symbol("$(orbital)_imag"))
     end
-end
-
-"""Print compact summary with real parts only"""
-function print_compact_summary(orbital_labels, combined_results, sorted_coords)
-    col_width = 25  # Width for each orbital column
-
-    println("\n----------------------------------------")
-    println("\nCompact summary (real parts only):")
-    println("----------------------------------------")
-
-    # Print header
-    header = @sprintf("%-15s", "imj")
-    for label in orbital_labels
-        header *= " " * lpad(label, col_width)
+    
+    filtered_df = filter_bins(df, startbin, endbin, dropmaxmin, n_bins, verbose, value_columns=value_columns)
+    
+    # Calculate statistics
+    results_df = calculate_statistics_multi_orbital(filtered_df, orbital_labels, auto_digits)
+    
+    # Add additional information
+    results_df.distance = [euclidean_distance(x, y) for (x, y) in zip(results_df.imj_x, results_df.imj_y)]
+    results_df.i_coord = [calculate_i_coord(x, y, Lx, Ly) for (x, y) in zip(results_df.imj_x, results_df.imj_y)]
+    
+    # Sort by distance
+    sort!(results_df, [:distance, :imj_x, :imj_y])
+    
+    # Print results
+    if verbose
+        print_correlation_results_multi_orbital(results_df, filename, Lx, Ly, orbital_labels, dropmaxmin, startbin, endbin, n_bins)
     end
-    println(header)
-    println("----------------------------------------")
-
-    # Print each coordinate
-    for coord in sorted_coords
-        imj_x, imj_y = coord
-
-        # Format coordinate
-        coord_str = "($imj_x,$imj_y)"
-        row = @sprintf("%-15s", coord_str)
-
-        # Add each orbital's data
-        for orbital_label in orbital_labels
-            if haskey(combined_results[coord], orbital_label)
-                mean_val, err_val = combined_results[coord][orbital_label]
-                formatted_real, formatted_real_err = format_value_error(real(mean_val), real(err_val))
-                orbital_data = "$(formatted_real) ± $(formatted_real_err)"
-                row *= " " * lpad(orbital_data, col_width)
-            else
-                row *= " " * lpad("N/A", col_width)
-            end
-        end
-        println(row)
-    end
-
-    println("----------------------------------------\n")
+    
+    return results_df
 end
