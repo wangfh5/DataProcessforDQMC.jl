@@ -4,6 +4,7 @@ using Printf
 using Statistics
 using DelimitedFiles
 using DataFrames
+using CSV
 
 # Basis statistical functions
 include("statistics.jl")
@@ -18,6 +19,7 @@ include("single-parameter-analysis/correlations-common.jl")
 include("single-parameter-analysis/correlations-rspace.jl")
 include("single-parameter-analysis/correlations-kspace.jl")
 include("single-parameter-analysis/structure-factors.jl")
-# include("multiple-parameter-analysis.jl")
+include("multiple-parameter-analysis.jl")
+
 
 end  # module DataProcessforDQMC
