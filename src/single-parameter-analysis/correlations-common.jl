@@ -101,32 +101,6 @@ function calculate_statistics(df, auto_digits;
                              input_coord_columns=[:imj_x, :imj_y],
                              output_coord_names=[:imj_x, :imj_y],
                              orbital_labels=nothing)
-    # 定义一个内部函数来计算统计量
-    function compute_stats(real_values, imag_values)
-        # 计算统计量
-        mean_real = mean(real_values)
-        mean_imag = mean(imag_values)
-        
-        # 计算误差（完整精度和格式化精度）
-        err_real = error(real_values, sigma=1, bessel=true, auto_digits=false)
-        err_imag = error(imag_values, sigma=1, bessel=true, auto_digits=false)
-        err_real_fmt = error(real_values, sigma=1, bessel=true, auto_digits=auto_digits)
-        err_imag_fmt = error(imag_values, sigma=1, bessel=true, auto_digits=auto_digits)
-        
-        # 格式化显示
-        formatted_real, formatted_real_err = format_value_error(mean_real, err_real_fmt)
-        formatted_imag, formatted_imag_err = format_value_error(mean_imag, err_imag_fmt)
-        
-        return (;
-            mean_real = mean_real,
-            mean_imag = mean_imag,
-            err_real = err_real,
-            err_imag = err_imag,
-            formatted_real = "$(formatted_real) ± $(formatted_real_err)",
-            formatted_imag = "$(formatted_imag) ± $(formatted_imag_err)"
-        )
-    end
-    
     # 对每个坐标分组
     grouped_df = groupby(df, :coord)
     
@@ -141,7 +115,7 @@ function calculate_statistics(df, auto_digits;
         
         # 单轨道模式
         if isnothing(orbital_labels)
-            stats = compute_stats(group_df.real_val, group_df.imag_val)
+            stats = compute_stats(group_df.real_val, group_df.imag_val, auto_digits=auto_digits)
             result = merge(result, stats)
         else
             # 多轨道模式
@@ -149,7 +123,7 @@ function calculate_statistics(df, auto_digits;
                 real_col = Symbol("$(orbital)_real")
                 imag_col = Symbol("$(orbital)_imag")
                 
-                stats = compute_stats(group_df[!, real_col], group_df[!, imag_col])
+                stats = compute_stats(group_df[!, real_col], group_df[!, imag_col], auto_digits=auto_digits)
                 
                 # 添加轨道前缀到统计量名称
                 orbital_stats = NamedTuple{

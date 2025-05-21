@@ -287,6 +287,47 @@ end
 ## -------------------------------------------------------------------------- ##
 
 """
+    compute_stats(real_values, imag_values; auto_digits=true)
+
+计算复数数据的统计量（平均值、误差和格式化字符串）。
+
+参数:
+- `real_values`: 实部值数组
+- `imag_values`: 虚部值数组
+- `auto_digits`: 是否自动确定有效数字 (默认: true)
+
+返回:
+- 包含以下字段的命名元组:
+  - `mean_real`, `mean_imag`: 平均值（实部和虚部）
+  - `err_real`, `err_imag`: 误差（实部和虚部）
+  - `formatted_real`, `formatted_imag`: 格式化后的结果字符串
+"""
+function compute_stats(real_values, imag_values; auto_digits=true)
+    # 计算统计量
+    mean_real = mean(real_values)
+    mean_imag = mean(imag_values)
+    
+    # 计算误差（完整精度和格式化精度）
+    err_real = error(real_values, sigma=1, bessel=true, auto_digits=false)
+    err_imag = error(imag_values, sigma=1, bessel=true, auto_digits=false)
+    err_real_fmt = error(real_values, sigma=1, bessel=true, auto_digits=auto_digits)
+    err_imag_fmt = error(imag_values, sigma=1, bessel=true, auto_digits=auto_digits)
+    
+    # 格式化显示
+    formatted_real, formatted_real_err = format_value_error(mean_real, err_real_fmt)
+    formatted_imag, formatted_imag_err = format_value_error(mean_imag, err_imag_fmt)
+    
+    return (;
+        mean_real = mean_real,
+        mean_imag = mean_imag,
+        err_real = err_real,
+        err_imag = err_imag,
+        formatted_real = "$(formatted_real) ± $(formatted_real_err)",
+        formatted_imag = "$(formatted_imag) ± $(formatted_imag_err)"
+    )
+end
+
+"""
     statistics_columns(df_tmp::DataFrame)
 average and error of each column of a dataframe with only `bin` and data columns.
 """
