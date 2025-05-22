@@ -96,28 +96,103 @@ function extract_parameters_from_dirname(dirname::AbstractString)
 end
 
 """
-    scan_parameter_directories(base_dir::AbstractString=pwd(); pattern::Regex=r"^proj_fft_honeycomb") -> Vector{String}
+    scan_parameter_directories(base_dir::AbstractString=pwd(); 
+                              filter_options::Union{Dict, NamedTuple}=Dict(), 
+                              pattern::Regex=r"^proj_fft_honeycomb") -> Vector{String}
 
-扫描指定目录下所有符合模式的子目录。
+扫描指定目录下所有符合筛选条件的子目录。
 
 # 参数
 - `base_dir::AbstractString=pwd()`: 基础目录路径，默认为当前工作目录
-- `pattern::Regex=r"^proj_fft_honeycomb"`: 用于匹配目录名的正则表达式
+- `filter_options::Union{Dict, NamedTuple}=Dict()`: 筛选选项，可以包含以下键：
+  - `:prefix`: 目录前缀（字符串或字符串数组）
+  - `:b`, `:U`, `:L`, `:dtau`, `:gw`: 参数范围（可以是单个值、范围或值数组）
+  - `:lprojgw`: 布尔值，是否使用lprojgw
+- `pattern::Regex=r"^proj_fft_honeycomb"`: 用于额外匹配目录名的正则表达式
 
 # 返回值
 - `Vector{String}`: 符合条件的子目录路径列表
+
+# 示例
+```julia
+# 筛选前缀为 "proj_fft_honeycomb_exact" 的目录
+dirs = scan_parameter_directories(filter_options=(prefix="proj_fft_honeycomb_exact",))
+
+# 筛选多个条件
+dirs = scan_parameter_directories(filter_options=Dict(
+    :prefix => ["proj_fft_honeycomb_exact", "proj_fft_honeycomb"],
+    :U => 4.0,
+    :L => [6, 9]
+))
+```
 """
-function scan_parameter_directories(base_dir::AbstractString=pwd(); pattern::Regex=r"^proj_fft_honeycomb")
+function scan_parameter_directories(base_dir::AbstractString=pwd(); 
+                                   filter_options::Union{Dict, NamedTuple}=Dict(), 
+                                   pattern::Regex=r"^proj_fft_honeycomb")
     result_dirs = String[]
     
     # 列出基础目录下的所有条目
     entries = readdir(base_dir, join=true)
     
-    # 过滤出目录并匹配模式
+    # 转换NamedTuple为Dict以统一处理
+    filter_dict = filter_options isa NamedTuple ? Dict(pairs(filter_options)) : filter_options
+    
+    # 过滤出目录
     for entry in entries
         if isdir(entry)
             dirname = basename(entry)
-            if match(pattern, dirname) !== nothing
+            
+            # 应用正则表达式筛选（如果提供）
+            if !isempty(pattern.pattern) && match(pattern, dirname) === nothing
+                continue
+            end
+            
+            # 如果没有筛选选项，则直接添加目录
+            if isempty(filter_dict)
+                push!(result_dirs, entry)
+                continue
+            end
+            
+            # 提取参数
+            params = extract_parameters_from_dirname(dirname)
+            
+            # 检查是否满足所有筛选条件
+            matches_all_filters = true
+            
+            for (key, filter_value) in filter_dict
+                # 获取参数值（如果不存在则为nothing）
+                param_value = get(params, key, nothing)
+                
+                # 如果参数不存在，则不满足条件
+                if param_value === nothing
+                    matches_all_filters = false
+                    break
+                end
+                
+                # 根据筛选值类型进行匹配
+                if filter_value isa AbstractArray
+                    # 数组：检查参数值是否在数组中
+                    if !(param_value in filter_value)
+                        matches_all_filters = false
+                        break
+                    end
+                elseif filter_value isa Tuple && length(filter_value) == 2
+                    # 范围：检查参数值是否在范围内
+                    if !(filter_value[1] <= param_value <= filter_value[2])
+                        matches_all_filters = false
+                        break
+                    end
+                else
+                    # 单个值：检查参数值是否相等
+                    if param_value != filter_value
+                        matches_all_filters = false
+                        break
+                    end
+                end
+            end
+            
+            # 如果满足所有条件，则添加目录
+            if matches_all_filters
                 push!(result_dirs, entry)
             end
         end
@@ -135,7 +210,9 @@ end
                                                dropmaxmin::Int=0,
                                                auto_digits::Bool=true, 
                                                tolerance::Float64=1e-6, 
-                                               verbose::Bool=false) -> DataFrame
+                                               verbose::Bool=false,
+                                               filter_options::Union{Dict, NamedTuple}=Dict(),
+                                               pattern::Regex=r"^proj_fft_honeycomb") -> DataFrame
 
 对多个参数目录执行反铁磁结构因子分析，并将结果整合到一个DataFrame中。
 
@@ -149,6 +226,8 @@ end
 - `auto_digits::Bool=true`: 是否自动确定有效数字
 - `tolerance::Float64=1e-6`: k点匹配容差
 - `verbose::Bool=false`: 是否显示详细信息
+- `filter_options::Union{Dict, NamedTuple}=Dict()`: 目录筛选选项，可包含:prefix、:b、:U等参数
+- `pattern::Regex=r"^proj_fft_honeycomb"`: 用于匹配目录名的正则表达式
 
 # 返回值
 - `DataFrame`: 包含所有参数和分析结果的DataFrame
@@ -161,9 +240,11 @@ function analyze_af_structure_factor_multi_parameter(base_dir::AbstractString=pw
                                                    dropmaxmin::Int=0,
                                                    auto_digits::Bool=true, 
                                                    tolerance::Float64=1e-6, 
-                                                   verbose::Bool=false)
+                                                   verbose::Bool=false,
+                                                   filter_options::Union{Dict, NamedTuple}=Dict(),
+                                                   pattern::Regex=r"^proj_fft_honeycomb")
     # 扫描参数目录
-    param_dirs = scan_parameter_directories(base_dir)
+    param_dirs = scan_parameter_directories(base_dir; filter_options=filter_options, pattern=pattern)
     
     if isempty(param_dirs)
         @warn "未在 $base_dir 中找到参数目录"
@@ -186,10 +267,58 @@ function analyze_af_structure_factor_multi_parameter(base_dir::AbstractString=pw
         # 检查必要文件是否存在
         filepath = joinpath(dir, filename)
         if !isfile(filepath)
-            if verbose
-                println("($i/$total_dirs) 跳过 $dirname: 文件 $filename 不存在")
+            # 尝试自动合并文件
+            auto_combined = false
+            
+            # 如果是 ss_k.bin 或 ss_r.bin，尝试合并 spsm 和 szsz 文件
+            if startswith(filename, "ss_") && (endswith(filename, "_k.bin") || endswith(filename, "_r.bin"))
+                # 确定对应的 spsm 和 szsz 文件名
+                space_type = endswith(filename, "_k.bin") ? "_k.bin" : "_r.bin"
+                spsm_file = "spsm" * space_type
+                szsz_file = "szsz" * space_type
+                
+                # 检查这两个文件是否存在
+                spsm_path = joinpath(dir, spsm_file)
+                szsz_path = joinpath(dir, szsz_file)
+                
+                if isfile(spsm_path) && isfile(szsz_path)
+                    if verbose
+                        println("($i/$total_dirs) 文件 $filename 不存在，尝试自动合并 $spsm_file 和 $szsz_file...")
+                    end
+                    
+                    # 确定保留列
+                    preserve_cols = space_type == "_k.bin" ? (1:2) : (1:3)
+                    
+                    # 合并文件
+                    try
+                        combine_ss_components(
+                            filename,
+                            spsm_file,
+                            szsz_file,
+                            1.0, 1.0,
+                            dir, dir;
+                            preserve_columns=preserve_cols,
+                            verbose=false
+                        )
+                        auto_combined = true
+                        if verbose
+                            println("($i/$total_dirs) 成功自动合并文件！")
+                        end
+                    catch e
+                        if verbose
+                            println("($i/$total_dirs) 合并文件失败: $e")
+                        end
+                    end
+                end
             end
-            continue
+            
+            # 如果没有自动合并成功，则跳过该目录
+            if !auto_combined
+                if verbose
+                    println("($i/$total_dirs) 跳过 $dirname: 文件 $filename 不存在")
+                end
+                continue
+            end
         end
         
         try

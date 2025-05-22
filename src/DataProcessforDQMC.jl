@@ -13,6 +13,9 @@ include("statistics.jl")
 include("format-dataframes.jl")
 include("read-dataframes.jl")
 
+# Data processing utilities
+include("data-processing/bin_file_operations.jl")
+
 # New functions - simple implementation of analysis scripts
 include("single-parameter-analysis/scalar-measurements.jl")
 include("single-parameter-analysis/correlations-common.jl")
