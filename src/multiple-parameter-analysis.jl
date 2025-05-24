@@ -58,14 +58,9 @@ export extract_parameters_from_dirname,
 function extract_parameters_from_dirname(dirname::AbstractString)
     params = Dict{Symbol, Any}()
     
-    # 提取前缀类型
-    if occursin("proj_fft_honeycomb_exact", dirname)
-        params[:prefix] = "proj_fft_honeycomb_exact"
-    elseif occursin("proj_fft_honeycomb", dirname)
-        params[:prefix] = "proj_fft_honeycomb"
-    else
-        params[:prefix] = "unknown"
-    end
+    # 使用正则表达式提取前缀
+    prefix_match = match(r"^(proj_fft_honeycomb(?:_[a-zA-Z]+)?)", dirname)
+    params[:prefix] = prefix_match !== nothing ? prefix_match.captures[1] : "unknown"
     
     # 提取数值参数
     # 温度参数b
@@ -73,11 +68,11 @@ function extract_parameters_from_dirname(dirname::AbstractString)
     params[:b] = b_match !== nothing ? parse(Float64, b_match.captures[1]) : NaN
     
     # 相互作用强度U
-    u_match = match(r"U(\d+\.\d+)", dirname)
+    u_match = match(r"U(-?\d+\.\d+)", dirname)
     params[:U] = u_match !== nothing ? parse(Float64, u_match.captures[1]) : NaN
     
     # Gutzwiller参数gw
-    gw_match = match(r"gw(\d+\.\d+)", dirname)
+    gw_match = match(r"gw(-?\d+\.\d+)", dirname)
     params[:gw] = gw_match !== nothing ? parse(Float64, gw_match.captures[1]) : NaN
     
     # 晶格尺寸L
@@ -91,6 +86,10 @@ function extract_parameters_from_dirname(dirname::AbstractString)
     # 求解投影参数lprojgw
     lprojgw_match = match(r"lprojgw([TF])", dirname)
     params[:lprojgw] = lprojgw_match !== nothing ? (lprojgw_match.captures[1] == "T") : nothing
+    
+    # CDW参数M_CDW
+    mcdw_match = match(r"M_CDW(-?\d+\.\d+)", dirname)
+    params[:M_CDW] = mcdw_match !== nothing ? parse(Float64, mcdw_match.captures[1]) : NaN
     
     return params
 end
@@ -251,33 +250,49 @@ function analyze_af_structure_factor_multi_parameter(base_dir::AbstractString=pw
         return DataFrame()
     end
     
-    # 结果存储
-    results = []
+    # Create DataFrame with predetermined columns
+    result_df = DataFrame(
+        # Parameters
+        directory = String[],
+        prefix = String[],
+        b = Float64[],
+        U = Float64[],
+        L = Int[],
+        dtau = Float64[],
+        # Gutzwiller parameters
+        gw = Union{Float64, Missing}[],
+        lprojgw = Union{Bool, Missing, Nothing}[],  # 允许 nothing 值
+        # Results
+        S_AF_real = Float64[],
+        S_AF_real_err = Float64[],
+        S_AF_imag = Float64[],
+        S_AF_imag_err = Float64[]
+    )
     
-    # 对每个目录执行分析
+    # Process each directory
     total_dirs = length(param_dirs)
     println("找到 $total_dirs 个参数目录进行分析...")
     
     for (i, dir) in enumerate(param_dirs)
         dirname = basename(dir)
         
-        # 提取参数
+        # Extract parameters
         params = extract_parameters_from_dirname(dirname)
         
-        # 检查必要文件是否存在
+        # Check if necessary file exists
         filepath = joinpath(dir, filename)
         if !isfile(filepath)
-            # 尝试自动合并文件
+            # Try auto-combining files
             auto_combined = false
             
-            # 如果是 ss_k.bin 或 ss_r.bin，尝试合并 spsm 和 szsz 文件
+            # If it's ss_k.bin or ss_r.bin, try combining spsm and szsz files
             if startswith(filename, "ss_") && (endswith(filename, "_k.bin") || endswith(filename, "_r.bin"))
-                # 确定对应的 spsm 和 szsz 文件名
+                # Determine corresponding spsm and szsz filenames
                 space_type = endswith(filename, "_k.bin") ? "_k.bin" : "_r.bin"
                 spsm_file = "spsm" * space_type
                 szsz_file = "szsz" * space_type
                 
-                # 检查这两个文件是否存在
+                # Check if both files exist
                 spsm_path = joinpath(dir, spsm_file)
                 szsz_path = joinpath(dir, szsz_file)
                 
@@ -286,10 +301,10 @@ function analyze_af_structure_factor_multi_parameter(base_dir::AbstractString=pw
                         println("($i/$total_dirs) 文件 $filename 不存在，尝试自动合并 $spsm_file 和 $szsz_file...")
                     end
                     
-                    # 确定保留列
+                    # Determine columns to preserve
                     preserve_cols = space_type == "_k.bin" ? (1:2) : (1:3)
                     
-                    # 合并文件
+                    # Combine files
                     try
                         combine_ss_components(
                             filename,
@@ -312,7 +327,7 @@ function analyze_af_structure_factor_multi_parameter(base_dir::AbstractString=pw
                 end
             end
             
-            # 如果没有自动合并成功，则跳过该目录
+            # Skip directory if auto-combining failed
             if !auto_combined
                 if verbose
                     println("($i/$total_dirs) 跳过 $dirname: 文件 $filename 不存在")
@@ -326,7 +341,7 @@ function analyze_af_structure_factor_multi_parameter(base_dir::AbstractString=pw
                 println("($i/$total_dirs) 分析 $dirname...")
             end
             
-            # 执行分析
+            # Perform analysis
             analysis_result = AFStructureFactor(
                 k_point, filename, dir;
                 startbin=startbin, 
@@ -334,32 +349,27 @@ function analyze_af_structure_factor_multi_parameter(base_dir::AbstractString=pw
                 dropmaxmin=dropmaxmin,
                 auto_digits=auto_digits, 
                 tolerance=tolerance,
-                verbose=false  # 我们自己处理输出
+                verbose=false  # Handle output ourselves
             )
             
-            # 组合参数和结果
-            result_entry = Dict(
-                # 参数
-                :directory => dirname,
-                :prefix => params[:prefix],
-                :b => params[:b],
-                :U => params[:U],
-                :L => params[:L],
-                :dtau => params[:dtau],
-                # Gutzwiller参数
-                :gw => get(params, :gw, NaN),  # 如果不存在则返回NaN
-                :lprojgw => get(params, :lprojgw, nothing),  # 如果不存在则返回null
-                # k点坐标
-                :k_point_x => analysis_result.k_point[1],
-                :k_point_y => analysis_result.k_point[2],
-                # 结果
-                :S_AF_real => analysis_result.mean_real,
-                :S_AF_real_err => analysis_result.err_real,
-                :S_AF_imag => analysis_result.mean_imag,
-                :S_AF_imag_err => analysis_result.err_imag
-            )
-            
-            push!(results, result_entry)
+            # Add row to DataFrame
+            push!(result_df, (
+                # Parameters
+                directory = dirname,
+                prefix = params[:prefix],
+                b = params[:b],
+                U = params[:U],
+                L = params[:L],
+                dtau = params[:dtau],
+                # Gutzwiller parameters - use missing for non-existent values
+                gw = get(params, :gw, missing),
+                lprojgw = get(params, :lprojgw, nothing),  # 保持原始的 nothing 值
+                # Results
+                S_AF_real = analysis_result.mean_real,
+                S_AF_real_err = analysis_result.err_real,
+                S_AF_imag = analysis_result.mean_imag,
+                S_AF_imag_err = analysis_result.err_imag
+            ))
             
             if verbose
                 println("($i/$total_dirs) 完成分析 $dirname")
@@ -370,34 +380,16 @@ function analyze_af_structure_factor_multi_parameter(base_dir::AbstractString=pw
         end
     end
     
-    # 转换为DataFrame
-    if isempty(results)
+    # Check if we have results
+    if nrow(result_df) == 0
         @warn "没有成功的分析结果"
         return DataFrame()
     end
     
-    result_df = DataFrame(results)
-    
-    # 排序（按b, U, L, dtau）
+    # Sort by (b, U, L, dtau)
     sort!(result_df, [:b, :U, :L, :dtau])
     
-    # 调整列顺序，确保值和误差列相邻
-    # 定义期望的列顺序
-    desired_columns = [
-        :directory, :prefix, :b, :U, :L, :dtau,  # 参数
-        :k_point_x, :k_point_y,                  # k点坐标
-        :S_AF_real, :S_AF_real_err,              # 实部及其误差
-        :S_AF_imag, :S_AF_imag_err               # 虚部及其误差
-    ]
-    
-    # 检查所有列是否存在
-    existing_columns = intersect(desired_columns, names(result_df))
-    other_columns = setdiff(names(result_df), existing_columns)
-    
-    # 重新排列列顺序
-    result_df = result_df[:, vcat(existing_columns, other_columns)]
-    
-    # 打印列顺序（用于调试）
+    # Print column order (for debugging)
     if verbose
         println("DataFrame列顺序: $(names(result_df))")
     end
@@ -423,7 +415,6 @@ function save_analysis_results(df::DataFrame, filename::AbstractString="analysis
     # 定义期望的列顺序
     desired_columns = [
         :directory, :prefix, :b, :U, :L, :dtau, :gw, :lprojgw,  # 参数
-        :k_point_x, :k_point_y,                  # k点坐标
         :S_AF_real, :S_AF_real_err,              # 实部及其误差
         :S_AF_imag, :S_AF_imag_err               # 虚部及其误差
     ]
