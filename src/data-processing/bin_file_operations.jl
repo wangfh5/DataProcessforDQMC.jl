@@ -19,7 +19,7 @@
    )
    
    # 使用合并后的文件进行结构因子分析
-   result = AFStructureFactor(filename=combined_file)
+   result = AFMStructureFactor(filename=combined_file)
    ```
 
 2. 自定义文件合并:

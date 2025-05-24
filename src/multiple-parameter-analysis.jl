@@ -41,7 +41,7 @@
 # 导出多参数分析函数
 export extract_parameters_from_dirname,
        scan_parameter_directories,
-       analyze_af_structure_factor_multi_parameter,
+       analyze_AFM_structure_factor_multi_parameter,
        save_analysis_results
 
 """
@@ -201,7 +201,7 @@ function scan_parameter_directories(base_dir::AbstractString=pwd();
 end
 
 """
-    analyze_af_structure_factor_multi_parameter(base_dir::AbstractString=pwd(); 
+    analyze_AFM_structure_factor_multi_parameter(base_dir::AbstractString=pwd(); 
                                                k_point::Tuple{<:Real,<:Real}=(0.0, 0.0),
                                                filename::String="spsm_k.bin",
                                                startbin::Int=2, 
@@ -231,7 +231,7 @@ end
 # 返回值
 - `DataFrame`: 包含所有参数和分析结果的DataFrame
 """
-function analyze_af_structure_factor_multi_parameter(base_dir::AbstractString=pwd(); 
+function analyze_AFM_structure_factor_multi_parameter(base_dir::AbstractString=pwd(); 
                                                    k_point::Tuple{<:Real,<:Real}=(0.0, 0.0),
                                                    filename::String="spsm_k.bin",
                                                    startbin::Int=2, 
@@ -342,7 +342,7 @@ function analyze_af_structure_factor_multi_parameter(base_dir::AbstractString=pw
             end
             
             # Perform analysis
-            analysis_result = AFStructureFactor(
+            analysis_result = AFMStructureFactor(
                 k_point, filename, dir;
                 startbin=startbin, 
                 endbin=endbin, 
