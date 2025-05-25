@@ -12,7 +12,8 @@
 
 =#
 
-export StructureFactorAnalysis, MultiOrbitalStructureFactorAnalysis, AFMStructureFactor, AFMCorrelationRatio
+export StructureFactorAnalysis, MultiOrbitalStructureFactorAnalysis
+export AFMStructureFactor, CDWStructureFactor, AFMCorrelationRatio
 
 # ----------------- Helper functions for structure factor analysis ---------------- #
 
@@ -145,84 +146,38 @@ function StructureFactorAnalysis(k_point::Tuple{<:Real,<:Real}, filename::String
                                 startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
                                 real_column::Int=3, imag_column::Int=4,
                                 auto_digits::Bool=true, tolerance::Float64=1e-6, verbose::Bool=true)
-    # 文件读取和基本验证
-    if !endswith(filename, ".bin")
-        filename = filename * ".bin"
-    end
     
-    filepath = joinpath(filedir, filename)
-    if !isfile(filepath)
-        @error "File not found: $filepath"
-    end
+    # 构建单轨道配置
+    orbital_columns = [(real_column, imag_column)]
+    orbital_labels = ["default"]
     
-    # 读取数据
-    data_array = readdlm(filepath, Float64)
-    
-    # 找到最接近的k点
-    k_points = unique([(data_array[i, 1], data_array[i, 2]) for i in 1:size(data_array, 1)])
-    closest_k, exact_match, distance = find_closest_k_point(k_points, k_point, tolerance)
-    
-    if verbose
-        if !exact_match
-            println("Requested k-point $(k_point) not found exactly.")
-            println("Using closest k-point: $(closest_k) (distance: $(round(distance, digits=6)))")
-        else
-            println("Exact match found for k-point: $(closest_k)")
-        end
-    end
-    
-    # 直接过滤出目标k点的数据
-    k_indices = findall(i -> isapprox(data_array[i, 1], closest_k[1], atol=tolerance) && 
-                           isapprox(data_array[i, 2], closest_k[2], atol=tolerance), 
-                        1:size(data_array, 1))
-    
-    if isempty(k_indices)
-        @error "No data found for k-point $(closest_k)."
-    end
-    
-    # 提取该k点的数据
-    k_data = data_array[k_indices, :]
-    
-    # 创建DataFrame，只包含该k点的数据
-    k_df = DataFrame(
-        :kx => k_data[:, 1],
-        :ky => k_data[:, 2],
-        :real_val => k_data[:, real_column],
-        :imag_val => k_data[:, imag_column],
-        :bin => 1:length(k_indices)
+    # 调用多轨道函数，但禁用verbose以避免重复输出
+    result = MultiOrbitalStructureFactorAnalysis(
+        k_point, "default", filename, filedir;
+        startbin=startbin, endbin=endbin, dropmaxmin=dropmaxmin,
+        orbital_columns=orbital_columns, orbital_labels=orbital_labels,
+        auto_digits=auto_digits, tolerance=tolerance, 
+        verbose=false  # 禁用verbose，我们将在下面自己处理输出
     )
     
-    # 计算bin信息
-    n_bins = length(k_indices)
-    
-    # 应用bin筛选（只对该k点的数据）
-    filtered_k_df = filter_bins(k_df, startbin, endbin, dropmaxmin, n_bins, verbose,
-                              value_columns=[:real_val, :imag_val])
-    
-    if isempty(filtered_k_df)
-        @error "No data found for k-point $(closest_k) after filtering."
-    end
-    
-    # 使用compute_stats函数计算统计量
-    stats = compute_stats(filtered_k_df.real_val, filtered_k_df.imag_val, auto_digits=auto_digits)
-    
-    # 打印结果
+    # 如果需要打印，使用原始的单轨道格式
     if verbose
         print_structure_factor_result(
-            closest_k, stats.mean_real, stats.mean_imag, stats.err_real, stats.err_imag,
-            stats.formatted_real, stats.formatted_imag, filename
+            result.k_point, result.mean_real, result.mean_imag, 
+            result.err_real, result.err_imag,
+            result.formatted_real, result.formatted_imag, filename
         )
     end
     
-    # 返回结果
+    # 返回与原始函数相同格式的结果（不包含orbital字段）
     return (
-        k_point = closest_k,
-        mean_real = stats.mean_real,
-        mean_imag = stats.mean_imag,
-        err_real = stats.err_real,
-        err_imag = stats.err_imag,
-        formatted_real = stats.formatted_real,
-        formatted_imag = stats.formatted_imag
+        k_point = result.k_point,
+        mean_real = result.mean_real,
+        mean_imag = result.mean_imag,
+        err_real = result.err_real,
+        err_imag = result.err_imag,
+        formatted_real = result.formatted_real,
+        formatted_imag = result.formatted_imag
     )
 end
 
@@ -373,149 +328,242 @@ function MultiOrbitalStructureFactorAnalysis(k_point::Tuple{<:Real,<:Real}, orbi
     )
 end
 
-"""
-    AFMStructureFactor(k_point=(0.0, 0.0), filename="spsm_k.bin", filedir=pwd();
-                     startbin=2, endbin=nothing, dropmaxmin=0,
-                     orbital_columns=[(3,4), (5,6), (7,8), (9,10)],
-                     orbital_labels=["AA", "AB", "BA", "BB"],
+"""    
+    AFMStructureFactor(k_point=(0.0, 0.0), filename="afm_sf_k.bin", filedir=pwd();
+                     source_file="spsm_k.bin", startbin=2, endbin=nothing, dropmaxmin=0,
                      auto_digits=true, tolerance=1e-6, verbose=true)
 
-计算反铁磁结构因子 S_AF(L) = [spsm_k(0,A,A) + spsm_k(0,B,B) - spsm_k(0,A,B) - spsm_k(0,B,A)]。
+Calculate antiferromagnetic structure factor S_AF(L) = [spsm_k(0,A,A) + spsm_k(0,B,B) - spsm_k(0,A,B) - spsm_k(0,B,A)].
 
-参数:
-- `k_point`: 目标动量点，默认为 (0.0, 0.0)
-- `filename`: 关联函数文件名 (默认: "spsm_k.bin")
-- `filedir`: 文件目录 (默认: 当前目录)
-- `startbin`: 起始bin (默认: 2)
-- `endbin`: 结束bin (默认: 所有bin)
-- `dropmaxmin`: 丢弃的最大最小值数量 (默认: 0)
-- `orbital_columns`: 轨道列索引数组 (默认: [(3,4), (5,6), (7,8), (9,10)])
-- `orbital_labels`: 轨道标签数组 (默认: ["AA", "AB", "BA", "BB"])
-- `auto_digits`: 是否自动确定有效数字 (默认: true)
-- `tolerance`: 匹配k点时的容差 (默认: 1e-6)
-- `verbose`: 是否输出详细信息 (默认: true)
+The function can use either:
+- A pre-processed file (default: "afm_sf_k.bin") containing the structure factor directly
+- A source file (e.g., "spsm_k.bin" or "ss_k.bin") to generate the structure factor file if it doesn't exist
 
-返回:
-- 包含以下字段的命名元组:
-  - `k_point`: 实际使用的k点坐标
-  - `mean_value`: 反铁磁结构因子平均值
-  - `err_value`: 反铁磁结构因子误差
-  - `formatted_value`: 格式化后的结果字符串
+Parameters:
+- `k_point`: Target momentum point, default (0.0, 0.0)
+- `filename`: Target structure factor file name (default: "afm_sf_k.bin")
+- `filedir`: Directory containing the files (default: current directory)
+- `source_file`: Source file to generate structure factor if needed (default: "spsm_k.bin")
+- `startbin`: Starting bin for statistics (default: 2)
+- `endbin`: Ending bin for statistics (default: all bins)
+- `dropmaxmin`: Number of max/min values to drop (default: 0)
+- `auto_digits`: Whether to automatically determine significant digits (default: true)
+- `tolerance`: Tolerance for k-point matching (default: 1e-6)
+- `verbose`: Whether to output detailed information (default: true)
 
-示例:
+Returns:
+- A named tuple with the following fields:
+  - `k_point`: The actual k-point used
+  - `mean_real`: Mean value of the real part
+  - `mean_imag`: Mean value of the imaginary part
+  - `err_real`: Error estimate for the real part
+  - `err_imag`: Error estimate for the imaginary part
+  - `formatted_real`: Formatted string for the real part
+  - `formatted_imag`: Formatted string for the imaginary part
+
+Examples:
 ```julia
-# 计算Γ点的反铁磁结构因子
+# Use existing afm_sf_k.bin file
 result = AFMStructureFactor()
-println("S_AF at Γ point: \$(result.formatted_value)")
+
+# Generate from spsm_k.bin if afm_sf_k.bin doesn't exist
+result = AFMStructureFactor()
+
+# Generate from ss_k.bin if afm_sf_k.bin doesn't exist
+result = AFMStructureFactor(source_file="ss_k.bin")
+
+# Specify custom filenames
+result = AFMStructureFactor(filename="custom_afm_sf.bin", source_file="custom_ss.bin")
 ```
 """
-function AFMStructureFactor(k_point::Tuple{<:Real,<:Real}=(0.0, 0.0), filename::String="spsm_k.bin", filedir::String=pwd();
-                          startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
-                          orbital_columns::Vector{Tuple{Int,Int}}=[(3,4), (5,6), (7,8), (9,10)],
-                          orbital_labels::Vector{String}=["AA", "AB", "BA", "BB"],
+function AFMStructureFactor(k_point::Tuple{<:Real,<:Real}=(0.0, 0.0), filename::String="afm_sf_k.bin", filedir::String=pwd();
+                          source_file::String="spsm_k.bin", startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
                           auto_digits::Bool=true, tolerance::Float64=1e-6, verbose::Bool=true)
-    # 验证轨道标签
-    required_labels = ["AA", "AB", "BA", "BB"]
-    if !all(label in orbital_labels for label in required_labels)
-        @error "AFMStructureFactor requires all of these orbital labels: $(join(required_labels, ", "))"
-    end
-    
-    # 文件读取和验证
+    # Ensure filename has .bin extension
     if !endswith(filename, ".bin")
         filename = filename * ".bin"
     end
+    target_filepath = joinpath(filedir, filename)
     
-    filepath = joinpath(filedir, filename)
-    if !isfile(filepath)
-        @error "File not found: $filepath"
-    end
-    
-    # 读取数据
-    data_array = readdlm(filepath, Float64)
-    
-    # 找到最接近的k点
-    k_points = unique([(data_array[i, 1], data_array[i, 2]) for i in 1:size(data_array, 1)])
-    closest_k, exact_match, distance = find_closest_k_point(k_points, k_point, tolerance)
-    
-    if verbose
-        if !exact_match
-            println("Requested k-point $(k_point) not found exactly.")
-            println("Using closest k-point: $(closest_k) (distance: $(round(distance, digits=6)))")
-        else
-            println("Exact match found for k-point: $(closest_k)")
+    # Check if target file exists, if not, generate it from source_file
+    if !isfile(target_filepath)
+        if verbose
+            println("Target file $filename not found. Generating from $source_file...")
+        end
+        
+        # Ensure source_file has .bin extension
+        if !endswith(source_file, ".bin")
+            source_file = source_file * ".bin"
+        end
+        
+        # Check if source file exists
+        source_filepath = joinpath(filedir, source_file)
+        if !isfile(source_filepath)
+            @error "Source file not found: $source_filepath"
+            return nothing
+        end
+        
+        # Generate target file using merge_staggered_components
+        # Use the same column indices for all file types
+        merge_staggered_components(
+            filename,            # Output filename
+            source_file,         # Input filename
+            filedir,            # Output directory
+            filedir;            # Input directory
+            real_columns=[3, 9, 5, 7],  # [AA, BB, AB, BA] real columns
+            imag_columns=[4, 10, 6, 8], # [AA, BB, AB, BA] imag columns
+            verbose=verbose
+        )
+        
+        # Verify the file was successfully generated
+        if !isfile(target_filepath)
+            @error "Failed to generate $filename from $source_file"
+            return nothing
         end
     end
     
-    # 直接过滤出目标k点的数据
-    k_indices = findall(i -> isapprox(data_array[i, 1], closest_k[1], atol=tolerance) && 
-                           isapprox(data_array[i, 2], closest_k[2], atol=tolerance), 
-                        1:size(data_array, 1))
-    
-    if isempty(k_indices)
-        @error "No data found for k-point $(closest_k)."
+    # Check if target file exists now
+    if !isfile(target_filepath)
+        @error "Target file not found: $target_filepath. Please provide a valid source_file to generate it."
+        return nothing
     end
     
-    # 提取该k点的数据
-    k_data = data_array[k_indices, :]
-    
-    # 创建DataFrame，只包含该k点的数据
-    k_df = DataFrame(
-        :kx => k_data[:, 1],
-        :ky => k_data[:, 2],
-        :bin => 1:length(k_indices)
-    )
-    
-    # 添加轨道列（实部和虚部）
-    for (i, (real_col, imag_col)) in enumerate(orbital_columns)
-        orbital = orbital_labels[i]
-        k_df[!, Symbol("$(orbital)_real")] = k_data[:, real_col]
-        k_df[!, Symbol("$(orbital)_imag")] = k_data[:, imag_col]
-    end
-    
-    # 计算bin信息
-    n_bins = length(k_indices)
-    
-    # 准备要过滤的值列（实部和虚部）
-    value_columns = Symbol[]
-    for orbital in orbital_labels
-        push!(value_columns, Symbol("$(orbital)_real"))
-        push!(value_columns, Symbol("$(orbital)_imag"))
-    end
-    
-    # 应用bin筛选
-    filtered_k_df = filter_bins(k_df, startbin, endbin, dropmaxmin, n_bins, verbose,
-                           value_columns=value_columns)
-    
-    if isempty(filtered_k_df)
-        @error "No data found for k-point $(closest_k) after filtering."
-    end
-    
-    # 计算每个bin的反铁磁结构因子 S_AF = AA + BB - AB - BA（分别处理实部和虚部）
-    af_real_values = [row.AA_real + row.BB_real - row.AB_real - row.BA_real for row in eachrow(filtered_k_df)]
-    af_imag_values = [row.AA_imag + row.BB_imag - row.AB_imag - row.BA_imag for row in eachrow(filtered_k_df)]
-    
-    # 使用compute_stats函数计算复数的统计量
-    stats = compute_stats(af_real_values, af_imag_values, auto_digits=auto_digits)
-    
-    # 打印结果
+    # Analyze the structure factor file
     if verbose
-        print_af_structure_factor_result(
-            closest_k, stats.mean_real, stats.mean_imag, stats.err_real, stats.err_imag, 
-            stats.formatted_real, stats.formatted_imag, 
-            filename
-        )
+        println("Analyzing $filename for k-point $k_point...")
     end
     
-    # 返回结果
-    return (
-        k_point = closest_k,
-        mean_real = stats.mean_real,
-        mean_imag = stats.mean_imag,
-        err_real = stats.err_real,
-        err_imag = stats.err_imag,
-        formatted_real = stats.formatted_real,
-        formatted_imag = stats.formatted_imag
+    # Call StructureFactorAnalysis function
+    result = StructureFactorAnalysis(
+        k_point,
+        filename,
+        filedir;
+        startbin=startbin,
+        endbin=endbin,
+        dropmaxmin=dropmaxmin,
+        auto_digits=auto_digits,
+        tolerance=tolerance,
+        verbose=verbose
     )
+    
+    return result
+end
+
+"""
+    CDWStructureFactor(k_point=(0.0, 0.0), filename="cdwpair_sf_k.bin", filedir=pwd();
+                     source_file="cdwpair_k.bin", startbin=2, endbin=nothing, dropmaxmin=0,
+                     auto_digits=true, tolerance=1e-6, verbose=true)
+
+Calculate charge density wave structure factor S_CDW(L) = [cdwpair_k(0,A,A) + cdwpair_k(0,B,B) + cdwpair_k(0,A,B) + cdwpair_k(0,B,A)].
+
+The function can use either:
+- A pre-processed file (default: "cdwpair_sf_k.bin") containing the structure factor directly
+- A source file (e.g., "cdwpair_k.bin") to generate the structure factor file if it doesn't exist
+
+Parameters:
+- `k_point`: Target momentum point, default (0.0, 0.0)
+- `filename`: Target structure factor file name (default: "cdwpair_sf_k.bin")
+- `filedir`: Directory containing the files (default: current directory)
+- `source_file`: Source file to generate structure factor if needed (default: "cdwpair_k.bin")
+- `startbin`: Starting bin for statistics (default: 2)
+- `endbin`: Ending bin for statistics (default: all bins)
+- `dropmaxmin`: Number of max/min values to drop (default: 0)
+- `auto_digits`: Whether to automatically determine significant digits (default: true)
+- `tolerance`: Tolerance for k-point matching (default: 1e-6)
+- `verbose`: Whether to output detailed information (default: true)
+
+Returns:
+- A named tuple with the following fields:
+  - `k_point`: The actual k-point used
+  - `mean_real`: Mean value of the real part
+  - `mean_imag`: Mean value of the imaginary part
+  - `err_real`: Error estimate for the real part
+  - `err_imag`: Error estimate for the imaginary part
+  - `formatted_real`: Formatted string for the real part
+  - `formatted_imag`: Formatted string for the imaginary part
+
+Examples:
+```julia
+# Use existing cdwpair_sf_k.bin file
+result = CDWStructureFactor()
+
+# Generate from cdwpair_k.bin if cdwpair_sf_k.bin doesn't exist
+result = CDWStructureFactor()
+
+# Specify custom filenames
+result = CDWStructureFactor(filename="custom_cdw_sf.bin", source_file="custom_cdw.bin")
+```
+"""
+function CDWStructureFactor(k_point::Tuple{<:Real,<:Real}=(0.0, 0.0), filename::String="cdwpair_sf_k.bin", filedir::String=pwd();
+                          source_file::String="cdwpair_k.bin", startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
+                          auto_digits::Bool=true, tolerance::Float64=1e-6, verbose::Bool=true)
+    # Ensure filename has .bin extension
+    if !endswith(filename, ".bin")
+        filename = filename * ".bin"
+    end
+    target_filepath = joinpath(filedir, filename)
+    
+    # Check if target file exists, if not, generate it from source_file
+    if !isfile(target_filepath)
+        if verbose
+            println("Target file $filename not found. Generating from $source_file...")
+        end
+        
+        # Ensure source_file has .bin extension
+        if !endswith(source_file, ".bin")
+            source_file = source_file * ".bin"
+        end
+        
+        # Check if source file exists
+        source_filepath = joinpath(filedir, source_file)
+        if !isfile(source_filepath)
+            @error "Source file not found: $source_filepath"
+            return nothing
+        end
+        
+        # Generate target file using merge_uniform_components
+        merge_uniform_components(
+            filename,            # Output filename
+            source_file,         # Input filename
+            filedir,            # Output directory
+            filedir;            # Input directory
+            real_columns=[3, 9, 5, 7],  # [AA, BB, AB, BA] real columns
+            imag_columns=[4, 10, 6, 8], # [AA, BB, AB, BA] imag columns
+            verbose=verbose
+        )
+        
+        # Verify the file was successfully generated
+        if !isfile(target_filepath)
+            @error "Failed to generate $filename from $source_file"
+            return nothing
+        end
+    end
+    
+    # Check if target file exists now
+    if !isfile(target_filepath)
+        @error "Target file not found: $target_filepath. Please provide a valid source_file to generate it."
+        return nothing
+    end
+    
+    # Analyze the structure factor file
+    if verbose
+        println("Analyzing $filename for k-point $k_point...")
+    end
+    
+    # Call StructureFactorAnalysis function
+    result = StructureFactorAnalysis(
+        k_point,
+        filename,
+        filedir;
+        startbin=startbin,
+        endbin=endbin,
+        dropmaxmin=dropmaxmin,
+        auto_digits=auto_digits,
+        tolerance=tolerance,
+        verbose=verbose
+    )
+    
+    return result
 end
 
 """    AFMCorrelationRatio(shift_point::Tuple{<:Real,<:Real}, Q_point::Tuple{<:Real,<:Real}=(0.0, 0.0),

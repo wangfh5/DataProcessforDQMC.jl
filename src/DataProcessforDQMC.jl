@@ -14,7 +14,8 @@ include("format-dataframes.jl")
 include("read-dataframes.jl")
 
 # Data processing utilities
-include("data-processing/bin_file_operations.jl")
+include("data-processing/bin-file-operations-basic.jl")
+include("data-processing/bin-file-operations-afm-cdwpair.jl")
 
 # New functions - simple implementation of analysis scripts
 include("single-parameter-analysis/scalar-measurements.jl")
