@@ -8,12 +8,12 @@
 - 单轨道结构因子分析 (StructureFactorAnalysis)
 - 多轨道结构因子分析 (MultiOrbitalStructureFactorAnalysis)
 - 反铁磁结构因子分析 (AFMStructureFactor)
-- 反铁磁相关比率分析 (AFMCorrelationRatio)
+- CDW结构因子分析 (CDWStructureFactor)
 
 =#
 
 export StructureFactorAnalysis, MultiOrbitalStructureFactorAnalysis
-export AFMStructureFactor, CDWStructureFactor, AFMCorrelationRatio
+export AFMStructureFactor, CDWStructureFactor
 
 # ----------------- Helper functions for structure factor analysis ---------------- #
 
@@ -564,130 +564,4 @@ function CDWStructureFactor(k_point::Tuple{<:Real,<:Real}=(0.0, 0.0), filename::
     )
     
     return result
-end
-
-"""    AFMCorrelationRatio(shift_point::Tuple{<:Real,<:Real}, Q_point::Tuple{<:Real,<:Real}=(0.0, 0.0),
-                     filename::String="spsm_k.bin", filedir::String=pwd();
-                     startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
-                     orbital_columns::Vector{Tuple{Int,Int}}=[(3,4), (5,6), (7,8), (9,10)],
-                     orbital_labels::Vector{String}=["AA", "AB", "BA", "BB"],
-                     auto_digits::Bool=true, tolerance::Float64=1e-6, verbose::Bool=true)
-
-计算自旋结构因子的相关比（Correlation Ratio）R_{m^2}，用于量化无序-有序相变。
-
-公式: R_{m^2} = 1 - S_AFM(Q+δq) / S_AFM(Q)
-其中: δq 是在倒格子空间中的小偏移
-
-参数:
-- `shift_point`: 动量空间偏移量 (δq_x, δq_y)
-- `Q_point`: 反铁磁向量Q (默认: (0.0, 0.0))
-- `filename`: 关联函数文件名 (默认: "spsm_k.bin")
-- `filedir`: 文件目录 (默认: 当前目录)
-- `startbin`: 起始bin (默认: 2)
-- `endbin`: 结束bin (默认: 所有bin)
-- `dropmaxmin`: 丢弃的最大最小值数量 (默认: 0)
-- `orbital_columns`: 轨道列索引数组 (默认: [(3,4), (5,6), (7,8), (9,10)])
-- `orbital_labels`: 轨道标签数组 (默认: ["AA", "AB", "BA", "BB"])
-- `auto_digits`: 是否自动确定有效数字 (默认: true)
-- `tolerance`: 匹配k点时的容差 (默认: 1e-6)
-- `verbose`: 是否输出详细信息 (默认: true)
-
-返回:
-- 包含以下字段的命名元组:
-  - `Q_point`: 反铁磁向量Q
-  - `shift_point`: 动量空间偏移量 (δq_x, δq_y)
-  - `Q_shifted`: 偏移后的k点
-  - `S_AFM_Q`: Q点处的反铁磁结构因子
-  - `err_S_AFM_Q`: Q点处的反铁磁结构因子误差
-  - `S_AFM_Q_shifted`: 偏移点处的反铁磁结构因子
-  - `err_S_AFM_Q_shifted`: 偏移点处的反铁磁结构因子误差
-  - `correlation_ratio`: 计算得到的相关比
-  - `err_correlation_ratio`: 相关比的误差
-  - `formatted_correlation_ratio`: 格式化后的相关比结果
-
-示例:
-```julia
-# 计算(0.25,0)偏移的相关比
-result = AFMCorrelationRatio((0.25, 0.0))
-println("Correlation Ratio: \$(result.formatted_correlation_ratio)")
-```
-
-"""
-function AFMCorrelationRatio(shift_point::Tuple{<:Real,<:Real}, Q_point::Tuple{<:Real,<:Real}=(0.0, 0.0),
-                         filename::String="spsm_k.bin", filedir::String=pwd();
-                         startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
-                         orbital_columns::Vector{Tuple{Int,Int}}=[(3,4), (5,6), (7,8), (9,10)],
-                         orbital_labels::Vector{String}=["AA", "AB", "BA", "BB"],
-                         auto_digits::Bool=true, tolerance::Float64=1e-6, verbose::Bool=true)
-    
-    # 计算Q点处的反铁磁结构因子
-    if verbose
-        println("计算Q点 $Q_point 处的反铁磁结构因子")
-    end
-    
-    S_AFM_Q = AFMStructureFactor(Q_point, filename, filedir;
-                              startbin=startbin, endbin=endbin, dropmaxmin=dropmaxmin,
-                              orbital_columns=orbital_columns, orbital_labels=orbital_labels,
-                              auto_digits=auto_digits, tolerance=tolerance, verbose=verbose)
-    
-    # 计算偏移后的k点坐标
-    shift_x, shift_y = shift_point
-    Q_shifted = (Q_point[1] + shift_x, Q_point[2] + shift_y)
-    
-    if verbose
-        println("\n计算偏移点 $Q_shifted 处的反铁磁结构因子")
-        println("偏移量: ($(round(shift_x, digits=6)), $(round(shift_y, digits=6)))")
-    end
-    
-    # 计算偏移点处的反铁磁结构因子
-    S_AFM_Q_shifted = AFMStructureFactor(Q_shifted, filename, filedir;
-                                      startbin=startbin, endbin=endbin, dropmaxmin=dropmaxmin,
-                                      orbital_columns=orbital_columns, orbital_labels=orbital_labels,
-                                      auto_digits=auto_digits, tolerance=tolerance, verbose=verbose)
-    
-    # 使用实部计算相关比（通常反铁磁结构因子主要是实部）
-    ratio = S_AFM_Q_shifted.mean_real / S_AFM_Q.mean_real
-    correlation_ratio = 1.0 - ratio
-    
-    # 误差传播 (使用一阶近似)：
-    # 如果 R = 1 - S2/S1，则 δR ≈ sqrt((S2/S1^2 * δS1)^2 + (1/S1 * δS2)^2)
-    S1 = S_AFM_Q.mean_real
-    S2 = S_AFM_Q_shifted.mean_real
-    dS1 = S_AFM_Q.err_real
-    dS2 = S_AFM_Q_shifted.err_real
-    
-    err_ratio = sqrt((S2/(S1^2) * dS1)^2 + (1/S1 * dS2)^2)
-    
-    # 使用round_error函数保留一位有效数字
-    rounded_err, _ = round_error(err_ratio, err_ratio/10)
-    
-    # 使用format_value_error函数格式化结果
-    formatted_val, formatted_err = format_value_error(correlation_ratio, rounded_err, 1)
-    formatted_correlation_ratio = "$(formatted_val) ± $(formatted_err)"
-    
-    # 打印结果
-    if verbose
-        println("\n自旋结构因子相关比（Correlation Ratio）分析:")
-        println("---------------------------------------------------")
-        println("Q点: $Q_point")
-        println("偏移点: $Q_shifted (偏移量: $shift_point)")
-        println("S_AFM(Q) = $(S_AFM_Q.formatted_real)")
-        println("S_AFM(Q+δq) = $(S_AFM_Q_shifted.formatted_real)")
-        println("相关比 R = 1 - S_AFM(Q+δq)/S_AFM(Q) = $formatted_correlation_ratio")
-        println("---------------------------------------------------")
-    end
-    
-    # 返回结果
-    return (
-        Q_point = Q_point,
-        shift_point = shift_point,
-        Q_shifted = Q_shifted,
-        S_AFM_Q = S_AFM_Q.mean_real,
-        err_S_AFM_Q = S_AFM_Q.err_real,
-        S_AFM_Q_shifted = S_AFM_Q_shifted.mean_real,
-        err_S_AFM_Q_shifted = S_AFM_Q_shifted.err_real,
-        correlation_ratio = correlation_ratio,
-        err_correlation_ratio = err_ratio,
-        formatted_correlation_ratio = formatted_correlation_ratio
-    )
 end

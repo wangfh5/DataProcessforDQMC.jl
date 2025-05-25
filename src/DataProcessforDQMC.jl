@@ -23,7 +23,9 @@ include("single-parameter-analysis/correlations-common.jl")
 include("single-parameter-analysis/correlations-rspace.jl")
 include("single-parameter-analysis/correlations-kspace.jl")
 include("single-parameter-analysis/structure-factors.jl")
-include("multiple-parameter-analysis.jl")
-
+include("single-parameter-analysis/correlation-ratio.jl")
+include("multiple-parameter-analysis/common-functions.jl")
+include("multiple-parameter-analysis/structure-factor.jl")
+include("multiple-parameter-analysis/correlation-ratio.jl")
 
 end  # module DataProcessforDQMC
