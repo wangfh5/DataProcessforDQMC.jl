@@ -329,19 +329,20 @@ end
 
 """    
     AFMStructureFactor(k_point=(0.0, 0.0), filename="afm_sf_k.bin", filedir=pwd();
-                     source_file="spsm_k.bin", startbin=2, endbin=nothing, dropmaxmin=0,
+                     force_rebuild=false, source_file="spsm_k.bin", startbin=2, endbin=nothing, dropmaxmin=0,
                      auto_digits=true, tolerance=1e-6, verbose=true)
 
 Calculate antiferromagnetic structure factor S_AF(L) = [spsm_k(0,A,A) + spsm_k(0,B,B) - spsm_k(0,A,B) - spsm_k(0,B,A)].
 
 The function can use either:
 - A pre-processed file (default: "afm_sf_k.bin") containing the structure factor directly
-- A source file (e.g., "spsm_k.bin" or "ss_k.bin") to generate the structure factor file if it doesn't exist
+- A source file (e.g., "spsm_k.bin" or "ss_k.bin") to generate the structure factor file if it doesn't exist or `force_rebuild` is true
 
 Parameters:
 - `k_point`: Target momentum point, default (0.0, 0.0)
 - `filename`: Target structure factor file name (default: "afm_sf_k.bin")
 - `filedir`: Directory containing the files (default: current directory)
+- `force_rebuild`: Whether to force rebuild the structure factor file even if it exists (default: false)
 - `source_file`: Source file to generate structure factor if needed (default: "spsm_k.bin")
 - `startbin`: Starting bin for statistics (default: 2)
 - `endbin`: Ending bin for statistics (default: all bins)
@@ -365,18 +366,15 @@ Examples:
 # Use existing afm_sf_k.bin file
 result = AFMStructureFactor()
 
-# Generate from spsm_k.bin if afm_sf_k.bin doesn't exist
-result = AFMStructureFactor()
-
-# Generate from ss_k.bin if afm_sf_k.bin doesn't exist
-result = AFMStructureFactor(source_file="ss_k.bin")
+# Force rebuild from source file
+result = AFMStructureFactor(force_rebuild=true)
 
 # Specify custom filenames
-result = AFMStructureFactor(filename="custom_afm_sf.bin", source_file="custom_ss.bin")
+result = AFMStructureFactor(filename="custom_afm_sf.bin", source_file="custom_afm_source.bin", force_rebuild=true)
 ```
 """
 function AFMStructureFactor(k_point::Tuple{<:Real,<:Real}=(0.0, 0.0), filename::String="afm_sf_k.bin", filedir::String=pwd();
-                          source_file::String="spsm_k.bin", startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
+                          force_rebuild::Bool=false, source_file::String="spsm_k.bin", startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
                           auto_digits::Bool=true, tolerance::Float64=1e-6, verbose::Bool=true)
     # Ensure filename has .bin extension
     if !endswith(filename, ".bin")
@@ -384,9 +382,23 @@ function AFMStructureFactor(k_point::Tuple{<:Real,<:Real}=(0.0, 0.0), filename::
     end
     target_filepath = joinpath(filedir, filename)
     
-    # Check if target file exists, if not, report error
-    if !isfile(target_filepath)
-        @error "Target file not found: $target_filepath"
+    # 如果强制重建或文件不存在，则重新生成文件
+    if force_rebuild || !isfile(target_filepath)
+        if verbose
+            println("$(force_rebuild ? "强制重建" : "文件不存在")，正在生成 $filename...")
+        end
+        
+        # 调用 afm_k_files_generation 函数重新生成文件
+        try
+            result_files = afm_k_files_generation(filedir; afm_source=source_file, verbose=false)
+
+            # 检查文件是否成功生成
+            if !isfile(target_filepath)
+                @error "无法生成目标文件: $target_filepath"
+            end
+        catch e
+            @error "生成文件时出错: $(sprint(showerror, e))"
+        end
     end
     
     # Analyze the structure factor file
@@ -410,21 +422,22 @@ function AFMStructureFactor(k_point::Tuple{<:Real,<:Real}=(0.0, 0.0), filename::
     return result
 end
 
-"""
+"""    
     CDWStructureFactor(k_point=(0.0, 0.0), filename="cdwpair_sf_k.bin", filedir=pwd();
-                     source_file="cdwpair_k.bin", startbin=2, endbin=nothing, dropmaxmin=0,
+                     force_rebuild=false, source_file="cdwpair_k.bin", startbin=2, endbin=nothing, dropmaxmin=0,
                      auto_digits=true, tolerance=1e-6, verbose=true)
 
 Calculate charge density wave structure factor S_CDW(L) = [cdwpair_k(0,A,A) + cdwpair_k(0,B,B) + cdwpair_k(0,A,B) + cdwpair_k(0,B,A)].
 
 The function can use either:
 - A pre-processed file (default: "cdwpair_sf_k.bin") containing the structure factor directly
-- A source file (e.g., "cdwpair_k.bin") to generate the structure factor file if it doesn't exist
+- A source file (e.g., "cdwpair_k.bin") to generate the structure factor file if it doesn't exist or `force_rebuild` is true
 
 Parameters:
 - `k_point`: Target momentum point, default (0.0, 0.0)
 - `filename`: Target structure factor file name (default: "cdwpair_sf_k.bin")
 - `filedir`: Directory containing the files (default: current directory)
+- `force_rebuild`: Whether to force rebuild the structure factor file even if it exists (default: false)
 - `source_file`: Source file to generate structure factor if needed (default: "cdwpair_k.bin")
 - `startbin`: Starting bin for statistics (default: 2)
 - `endbin`: Ending bin for statistics (default: all bins)
@@ -448,15 +461,15 @@ Examples:
 # Use existing cdwpair_sf_k.bin file
 result = CDWStructureFactor()
 
-# Generate from cdwpair_k.bin if cdwpair_sf_k.bin doesn't exist
-result = CDWStructureFactor()
+# Force rebuild from source file
+result = CDWStructureFactor(force_rebuild=true)
 
 # Specify custom filenames
-result = CDWStructureFactor(filename="custom_cdw_sf.bin", source_file="custom_cdw.bin")
+result = CDWStructureFactor(filename="custom_cdw_sf.bin", source_file="custom_cdw.bin", force_rebuild=true)
 ```
 """
 function CDWStructureFactor(k_point::Tuple{<:Real,<:Real}=(0.0, 0.0), filename::String="cdwpair_sf_k.bin", filedir::String=pwd();
-                          source_file::String="cdwpair_k.bin", startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
+                          force_rebuild::Bool=false, source_file::String="cdwpair_k.bin", startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
                           auto_digits::Bool=true, tolerance::Float64=1e-6, verbose::Bool=true)
     # Ensure filename has .bin extension
     if !endswith(filename, ".bin")
@@ -464,9 +477,23 @@ function CDWStructureFactor(k_point::Tuple{<:Real,<:Real}=(0.0, 0.0), filename::
     end
     target_filepath = joinpath(filedir, filename)
     
-    # Check if target file exists, if not, report error
-    if !isfile(target_filepath)
-        error("Target file not found: $target_filepath")
+    # 如果强制重建或文件不存在，则重新生成文件
+    if force_rebuild || !isfile(target_filepath)
+        if verbose
+            println("$(force_rebuild ? "强制重建" : "文件不存在")，正在生成 $filename...")
+        end
+        
+        # 调用 cdwpair_k_files_generation 函数重新生成文件
+        try
+            result_files = cdwpair_k_files_generation(filedir; cdwpair_source=source_file, verbose=false)
+            
+            # 检查文件是否成功生成
+            if !isfile(target_filepath)
+                @error "无法生成目标文件: $target_filepath"
+            end
+        catch e
+            @error "生成文件时出错: $(sprint(showerror, e))"
+        end
     end
     
     # Analyze the structure factor file

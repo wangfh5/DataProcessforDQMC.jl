@@ -17,6 +17,7 @@ export analyze_structure_factor_multi_parameter,
                                            base_dir::AbstractString=pwd(); 
                                            k_point::Tuple{<:Real,<:Real}=(0.0, 0.0),
                                            filename::String="afm_sf_k.bin",
+                                           force_rebuild::Bool=false,
                                            source_file::String="spsm_k.bin",
                                            result_columns::Vector{Symbol}=[:S_real, :S_real_err, :S_imag, :S_imag_err],
                                            result_prefix::String="S",
@@ -36,6 +37,7 @@ export analyze_structure_factor_multi_parameter,
 - `base_dir::AbstractString=pwd()`: 基础目录路径，默认为当前工作目录
 - `k_point::Tuple{<:Real,<:Real}=(0.0, 0.0)`: 要分析的k点
 - `filename::String="afm_sf_k.bin"`: 要分析的结构因子文件名
+- `force_rebuild::Bool=false`: 是否强制重新构建结构因子文件
 - `source_file::String="spsm_k.bin"`: 当 filename 不存在时，用于生成结构因子的源文件名
 - `result_columns::Vector{Symbol}`: 结果列的名称，默认为 [:S_real, :S_real_err, :S_imag, :S_imag_err]
 - `result_prefix::String`: 结果列名称的前缀，如 "S_AF" 或 "S_CDW"
@@ -55,6 +57,7 @@ function analyze_structure_factor_multi_parameter(analyzer_function::Function,
                                            base_dir::AbstractString=pwd(); 
                                            k_point::Tuple{<:Real,<:Real}=(0.0, 0.0),
                                            filename::String="afm_sf_k.bin",
+                                           force_rebuild::Bool=false,
                                            source_file::String="spsm_k.bin",
                                            result_columns::Vector{Symbol}=[:S_real, :S_real_err, :S_imag, :S_imag_err],
                                            result_prefix::String="S",
@@ -123,6 +126,7 @@ function analyze_structure_factor_multi_parameter(analyzer_function::Function,
             # 执行分析
             analysis_result = analyzer_function(
                 k_point, filename, dir;
+                force_rebuild=force_rebuild,
                 source_file=source_file,
                 startbin=startbin, 
                 endbin=endbin, 
@@ -184,6 +188,7 @@ end
     analyze_AFM_structure_factor_multi_parameter(base_dir::AbstractString=pwd(); 
                                                k_point::Tuple{<:Real,<:Real}=(0.0, 0.0),
                                                filename::String="afm_sf_k.bin",
+                                               force_rebuild::Bool=false,
                                                source_file::String="spsm_k.bin",
                                                startbin::Int=2, 
                                                endbin::Union{Int,Nothing}=nothing, 
@@ -200,6 +205,7 @@ end
 - `base_dir::AbstractString=pwd()`: 基础目录路径，默认为当前工作目录
 - `k_point::Tuple{<:Real,<:Real}=(0.0, 0.0)`: 要分析的k点
 - `filename::String="afm_sf_k.bin"`: 要分析的结构因子文件名
+- `force_rebuild::Bool=false`: 是否强制重新构建结构因子文件
 - `source_file::String="spsm_k.bin"`: 当 filename 不存在时，用于生成结构因子的源文件名
 - `startbin::Int=2`: 起始bin编号
 - `endbin::Union{Int,Nothing}=nothing`: 结束bin编号
@@ -216,6 +222,7 @@ end
 function analyze_AFM_structure_factor_multi_parameter(base_dir::AbstractString=pwd(); 
                                                    k_point::Tuple{<:Real,<:Real}=(0.0, 0.0),
                                                    filename::String="afm_sf_k.bin",
+                                                   force_rebuild::Bool=false,
                                                    source_file::String="spsm_k.bin",
                                                    startbin::Int=2, 
                                                    endbin::Union{Int,Nothing}=nothing, 
@@ -231,6 +238,7 @@ function analyze_AFM_structure_factor_multi_parameter(base_dir::AbstractString=p
         base_dir;
         k_point=k_point,
         filename=filename,
+        force_rebuild=force_rebuild,
         source_file=source_file,
         result_columns=[:mean_real, :err_real, :mean_imag, :err_imag],
         result_prefix="S_AF",
@@ -250,6 +258,7 @@ end
     analyze_CDW_structure_factor_multi_parameter(base_dir::AbstractString=pwd(); 
                                                k_point::Tuple{<:Real,<:Real}=(0.0, 0.0),
                                                filename::String="cdwpair_sf_k.bin",
+                                               force_rebuild::Bool=false,
                                                source_file::String="cdwpair_k.bin",
                                                startbin::Int=2, 
                                                endbin::Union{Int,Nothing}=nothing, 
@@ -266,6 +275,7 @@ end
 - `base_dir::AbstractString=pwd()`: 基础目录路径，默认为当前工作目录
 - `k_point::Tuple{<:Real,<:Real}=(0.0, 0.0)`: 要分析的k点
 - `filename::String="cdwpair_sf_k.bin"`: 要分析的结构因子文件名
+- `force_rebuild::Bool=false`: 是否强制重新构建结构因子文件
 - `source_file::String="cdwpair_k.bin"`: 当 filename 不存在时，用于生成结构因子的源文件名
 - `startbin::Int=2`: 起始bin编号
 - `endbin::Union{Int,Nothing}=nothing`: 结束bin编号
@@ -282,6 +292,7 @@ end
 function analyze_CDW_structure_factor_multi_parameter(base_dir::AbstractString=pwd(); 
                                                    k_point::Tuple{<:Real,<:Real}=(0.0, 0.0),
                                                    filename::String="cdwpair_sf_k.bin",
+                                                   force_rebuild::Bool=false,
                                                    source_file::String="cdwpair_k.bin",
                                                    startbin::Int=2, 
                                                    endbin::Union{Int,Nothing}=nothing, 
@@ -297,6 +308,7 @@ function analyze_CDW_structure_factor_multi_parameter(base_dir::AbstractString=p
         base_dir;
         k_point=k_point,
         filename=filename,
+        force_rebuild=force_rebuild,
         source_file=source_file,
         result_columns=[:mean_real, :err_real, :mean_imag, :err_imag],
         result_prefix="S_CDW",

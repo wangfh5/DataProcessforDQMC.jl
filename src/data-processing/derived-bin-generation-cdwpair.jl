@@ -25,6 +25,76 @@
 export cdwpair_k_files_generation
 export create_cdw_from_nn, combine_cdwpair_components, merge_cdw_sf
 
+
+"""
+    cdwpair_k_files_generation(dir::AbstractString=pwd(); cdwpair_source::String="cdwpair_k.bin", verbose::Bool=true)
+
+生成目录中与电荷密度波和配对相关的衍生数据文件。
+
+# 参数
+- `dir::AbstractString`: 数据目录，默认为当前工作目录
+- `cdwpair_source::String`: 用于生成CDW配对结构因子的源文件名，默认为"cdwpair_k.bin"
+- `verbose::Bool`: 是否输出详细信息，默认为true
+
+# 返回值
+- `Dict{String, String}`: 包含生成的文件路径的字典，键为文件名，值为完整路径
+
+# 示例
+```julia
+# 使用默认设置生成CDW和配对相关文件
+files = cdwpair_k_files_generation()
+
+# 指定目录和源文件
+files = cdwpair_k_files_generation("/path/to/data", cdwpair_source="custom_cdwpair_k.bin", verbose=true)
+```
+"""
+function cdwpair_k_files_generation(dir::AbstractString=pwd(); cdwpair_source::String="cdwpair_k.bin", verbose::Bool=true)
+    result = Dict{String, String}()
+    
+    try
+        verbose && println("===== 开始生成CDW和配对相关文件 =====")
+        
+        # 1. 生成cdw_k.bin
+        verbose && println("正在生成 cdw_k.bin...")
+        cdw_path = create_cdw_from_nn("cdw_k.bin", "nn_k.bin", dir, dir; verbose=false)
+        if cdw_path != ""
+            result["cdw_k.bin"] = cdw_path
+            verbose && println("✓ 成功生成 cdw_k.bin")
+        else
+            verbose && println("⚠  生成 cdw_k.bin 失败")
+        end
+        
+        # 2. 生成cdwpair_k.bin
+        verbose && println("\n正在生成 cdwpair_k.bin...")
+        cdwpair_path = combine_cdwpair_components("cdwpair_k.bin", "cdw_k.bin", "pair_onsite_k.bin", dir, dir; verbose=false)
+        if cdwpair_path != ""
+            result["cdwpair_k.bin"] = cdwpair_path
+            verbose && println("✓ 成功生成 cdwpair_k.bin")
+        else
+            verbose && println("⚠  生成 cdwpair_k.bin 失败")
+        end
+        
+        # 3. 生成cdwpair_sf_k.bin
+        verbose && println("\n正在生成 cdwpair_sf_k.bin...")
+        cdwpair_sf_path = merge_cdw_sf("cdwpair_sf_k.bin", cdwpair_source, dir, dir; verbose=false)
+        if isfile(joinpath(dir, "cdwpair_sf_k.bin"))
+            result["cdwpair_sf_k.bin"] = cdwpair_sf_path
+            verbose && println("✓ 成功生成 cdwpair_sf_k.bin")
+        else
+            verbose && println("⚠  生成 cdwpair_sf_k.bin 失败")
+        end
+        
+        verbose && println("\n===== CDW和配对相关文件生成完成 =====")
+        verbose && println("成功生成 $(length(result)) 个文件")
+        
+        return result
+    catch e
+        error_msg = "生成CDW和配对相关文件时出错: " * sprint(showerror, e)
+        verbose && println("\n✗ 错误: ", error_msg)
+        rethrow()
+    end
+end
+
 """
     create_cdw_from_nn(
         output_filename::String="cdw_k.bin",
@@ -237,74 +307,5 @@ function merge_cdw_sf(
     catch e
         error_msg = "计算电荷密度波结构因子时出错: " * sprint(showerror, e)
         verbose && println("错误: ", error_msg)
-    end
-end
-
-"""
-    cdwpair_k_files_generation(dir::AbstractString=pwd(); cdwpair_source::String="cdwpair_k.bin", verbose::Bool=true)
-
-生成目录中与电荷密度波和配对相关的衍生数据文件。
-
-# 参数
-- `dir::AbstractString`: 数据目录，默认为当前工作目录
-- `cdwpair_source::String`: 用于生成CDW配对结构因子的源文件名，默认为"cdwpair_k.bin"
-- `verbose::Bool`: 是否输出详细信息，默认为true
-
-# 返回值
-- `Dict{String, String}`: 包含生成的文件路径的字典，键为文件名，值为完整路径
-
-# 示例
-```julia
-# 使用默认设置生成CDW和配对相关文件
-files = cdwpair_k_files_generation()
-
-# 指定目录和源文件
-files = cdwpair_k_files_generation("/path/to/data", cdwpair_source="custom_cdwpair_k.bin", verbose=true)
-```
-"""
-function cdwpair_k_files_generation(dir::AbstractString=pwd(); cdwpair_source::String="cdwpair_k.bin", verbose::Bool=true)
-    result = Dict{String, String}()
-    
-    try
-        verbose && println("===== 开始生成CDW和配对相关文件 =====")
-        
-        # 1. 生成cdw_k.bin
-        verbose && println("正在生成 cdw_k.bin...")
-        cdw_path = create_cdw_from_nn("cdw_k.bin", "nn_k.bin", dir, dir; verbose=false)
-        if cdw_path != ""
-            result["cdw_k.bin"] = cdw_path
-            verbose && println("✓ 成功生成 cdw_k.bin")
-        else
-            verbose && println("⚠  生成 cdw_k.bin 失败")
-        end
-        
-        # 2. 生成cdwpair_k.bin
-        verbose && println("\n正在生成 cdwpair_k.bin...")
-        cdwpair_path = combine_cdwpair_components("cdwpair_k.bin", "cdw_k.bin", "pair_onsite_k.bin", dir, dir; verbose=false)
-        if cdwpair_path != ""
-            result["cdwpair_k.bin"] = cdwpair_path
-            verbose && println("✓ 成功生成 cdwpair_k.bin")
-        else
-            verbose && println("⚠  生成 cdwpair_k.bin 失败")
-        end
-        
-        # 3. 生成cdwpair_sf_k.bin
-        verbose && println("\n正在生成 cdwpair_sf_k.bin...")
-        cdwpair_sf_path = merge_cdw_sf("cdwpair_sf_k.bin", cdwpair_source, dir, dir; verbose=false)
-        if isfile(joinpath(dir, "cdwpair_sf_k.bin"))
-            result["cdwpair_sf_k.bin"] = cdwpair_sf_path
-            verbose && println("✓ 成功生成 cdwpair_sf_k.bin")
-        else
-            verbose && println("⚠  生成 cdwpair_sf_k.bin 失败")
-        end
-        
-        verbose && println("\n===== CDW和配对相关文件生成完成 =====")
-        verbose && println("成功生成 $(length(result)) 个文件")
-        
-        return result
-    catch e
-        error_msg = "生成CDW和配对相关文件时出错: " * sprint(showerror, e)
-        verbose && println("\n✗ 错误: ", error_msg)
-        rethrow()
     end
 end
