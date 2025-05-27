@@ -6,10 +6,13 @@
 1. 合并多个数据文件 （combine）
 2. 对数据文件的不同列进行标量缩放 （scale）
 3. 以线性叠加的方式合并数据文件的不同列为单列 （merge）
+    3.1 两轨道交错合并（merge_staggered_components）
+    3.2 两轨道均匀合并（merge_uniform_components）
 =#
 
 # 导出函数
 export combine_bin_files, scale_bin_columns, merge_bin_columns
+export merge_staggered_components, merge_uniform_components
 
 # ---------------------------------------------------------------------------- #
 #                         Basic operations on bin files                        #
@@ -342,7 +345,7 @@ end
 - `verbose`: 是否输出详细信息，默认为false
 
 返回：
-- 合并后的文件完整路径
+- 合并后的文件完整路径或者空字符串（如果失败）
 
 示例：
 ```julia
@@ -450,4 +453,187 @@ function merge_bin_columns(
     end
     
     return output_path
+end
+
+# ---------------------------------------------------------------------------- #
+#                      Merge functions for 2-orbital data                      #
+# ---------------------------------------------------------------------------- #
+
+"""    
+    merge_staggered_components(
+        output_filename::String="afm_sf_k.bin",
+        input_filename::String="ss_k.bin",
+        output_dir::String=pwd(),
+        input_dir::String=pwd();
+        real_columns::Vector{Int}=[3, 9, 5, 7],  # [AA, BB, AB, BA] 实部列
+        imag_columns::Vector{Int}=[4, 10, 6, 8], # [AA, BB, AB, BA] 虚部列
+        preserve_columns::UnitRange{Int}=1:2,
+        verbose::Bool=false
+    )
+
+将多列数据使用交错相位的方式合并，生成新的数据文件。
+公式: S = A + B - C - D，其中 A, B, C, D 分别对应数组中的四个列索引。
+
+这种合并方式常用于计算反铁磁结构因子，其中 S_AF = AA + BB - AB - BA。
+默认的文件名设置（ss_k.bin -> afm_sf_k.bin）反映了这一应用场景。
+
+# 参数
+- `output_filename::String="afm_sf_k.bin"`: 输出文件名
+- `input_filename::String="ss_k.bin"`: 输入文件名
+- `output_dir::String=pwd()`: 输出目录，默认为当前目录
+- `input_dir::String=pwd()`: 输入目录，默认为当前目录
+- `real_columns::Vector{Int}=[3, 9, 5, 7]`: 实部列索引数组，顺序为[A, B, C, D]
+- `imag_columns::Vector{Int}=[4, 10, 6, 8]`: 虚部列索引数组，顺序为[A, B, C, D]
+- `preserve_columns::UnitRange{Int}=1:2`: 要保留的列范围，默认为1:2（通常是k点坐标）
+- `verbose::Bool=false`: 是否输出详细信息，默认为false
+
+# 返回值
+- 合并后的文件完整路径或者空字符串（如果失败）
+
+# 示例
+```julia
+# 计算反铁磁结构因子
+afm_sf_file = merge_staggered_components(
+    "afm_sf_k.bin",
+    "ss_k.bin"
+)
+
+# 自定义列索引
+result = merge_staggered_components(
+    "custom_output.bin",
+    "custom_input.bin",
+    real_columns=[3, 5, 7, 9],
+    imag_columns=[4, 6, 8, 10]
+)
+```
+"""
+function merge_staggered_components(
+    output_filename::String="afm_sf_k.bin",
+    input_filename::String="ss_k.bin",
+    output_dir::String=pwd(),
+    input_dir::String=pwd();
+    real_columns::Vector{Int}=[3, 9, 5, 7],  # [A, B, C, D] 实部列
+    imag_columns::Vector{Int}=[4, 10, 6, 8], # [A, B, C, D] 虚部列
+    preserve_columns::UnitRange{Int}=1:2,
+    verbose::Bool=false
+)
+    # 确保列数组长度正确
+    @assert length(real_columns) == 4 "实部列数组必须包含4个元素 [A, B, C, D]"
+    @assert length(imag_columns) == 4 "虚部列数组必须包含4个元素 [A, B, C, D]"
+    
+    # 定义合并公式: S = A + B - C - D
+    weights = [1.0, 1.0, -1.0, -1.0]  # 正权重用于A和B，负权重用于C和D
+    
+    if verbose
+        println("使用交错相位合并列: S = A + B - C - D")
+        println("A: 列 $(real_columns[1]) (实部), $(imag_columns[1]) (虚部), 权重: 1.0")
+        println("B: 列 $(real_columns[2]) (实部), $(imag_columns[2]) (虚部), 权重: 1.0")
+        println("C: 列 $(real_columns[3]) (实部), $(imag_columns[3]) (虚部), 权重: -1.0")
+        println("D: 列 $(real_columns[4]) (实部), $(imag_columns[4]) (虚部), 权重: -1.0")
+    end
+    
+    # 调用通用的merge_bin_columns函数
+    result = merge_bin_columns(
+        output_filename,
+        input_filename,
+        real_columns,
+        imag_columns,
+        weights,
+        output_dir,
+        input_dir;
+        preserve_columns=preserve_columns,
+        verbose=verbose
+    )
+    
+    return result
+end
+
+
+"""    
+    merge_uniform_components(
+        output_filename::String="cdwpair_sf_k.bin",
+        input_filename::String="cdwpair_k.bin",
+        output_dir::String=pwd(),
+        input_dir::String=pwd();
+        real_columns::Vector{Int}=[3, 9, 5, 7],  # [A, B, C, D] 实部列
+        imag_columns::Vector{Int}=[4, 10, 6, 8], # [A, B, C, D] 虚部列
+        preserve_columns::UnitRange{Int}=1:2,
+        verbose::Bool=false
+    )
+
+将多列数据使用统一相位的方式合并，生成新的数据文件。
+公式: S = A + B + C + D，其中 A, B, C, D 分别对应数组中的四个列索引。
+
+这种合并方式常用于计算电荷结构因子，其中 S_charge = AA + BB + AB + BA。
+默认的文件名设置（cdwpair_k.bin -> cdwpair_sf_k.bin）反映了这一应用场景。
+
+# 参数
+- `output_filename::String="cdwpair_sf_k.bin"`: 输出文件名
+- `input_filename::String="cdwpair_k.bin"`: 输入文件名
+- `output_dir::String=pwd()`: 输出目录，默认为当前目录
+- `input_dir::String=pwd()`: 输入目录，默认为当前目录
+- `real_columns::Vector{Int}=[3, 9, 5, 7]`: 实部列索引数组，顺序为[A, B, C, D]
+- `imag_columns::Vector{Int}=[4, 10, 6, 8]`: 虚部列索引数组，顺序为[A, B, C, D]
+- `preserve_columns::UnitRange{Int}=1:2`: 要保留的列范围，默认为1:2（通常是k点坐标）
+- `verbose::Bool=false`: 是否输出详细信息，默认为false
+
+# 返回值
+- 合并后的文件完整路径或者空字符串（如果失败）
+
+# 示例
+```julia
+# 计算电荷结构因子
+cdwpair_sf_file = merge_uniform_components(
+    "cdwpair_sf_k.bin",
+    "cdwpair_k.bin"
+)
+
+# 自定义列索引
+result = merge_uniform_components(
+    "custom_output.bin",
+    "custom_input.bin",
+    real_columns=[3, 5, 7, 9],
+    imag_columns=[4, 6, 8, 10]
+)
+```
+"""
+function merge_uniform_components(
+    output_filename::String="cdwpair_sf_k.bin",
+    input_filename::String="cdwpair_k.bin",
+    output_dir::String=pwd(),
+    input_dir::String=pwd();
+    real_columns::Vector{Int}=[3, 9, 5, 7],  # [A, B, C, D] 实部列
+    imag_columns::Vector{Int}=[4, 10, 6, 8], # [A, B, C, D] 虚部列
+    preserve_columns::UnitRange{Int}=1:2,
+    verbose::Bool=false
+)
+    # 确保列数组长度正确
+    @assert length(real_columns) == 4 "实部列数组必须包含4个元素 [A, B, C, D]"
+    @assert length(imag_columns) == 4 "虚部列数组必须包含4个元素 [A, B, C, D]"
+    
+    # 定义合并公式: S = A + B + C + D
+    weights = [1.0, 1.0, 1.0, 1.0]  # 所有分量都使用正权重
+    
+    if verbose
+        println("使用统一相位合并列: S = A + B + C + D")
+        println("A: 列 $(real_columns[1]) (实部), $(imag_columns[1]) (虚部), 权重: 1.0")
+        println("B: 列 $(real_columns[2]) (实部), $(imag_columns[2]) (虚部), 权重: 1.0")
+        println("C: 列 $(real_columns[3]) (实部), $(imag_columns[3]) (虚部), 权重: 1.0")
+        println("D: 列 $(real_columns[4]) (实部), $(imag_columns[4]) (虚部), 权重: 1.0")
+    end
+    
+    # 调用通用的merge_bin_columns函数
+    result = merge_bin_columns(
+        output_filename,
+        input_filename,
+        real_columns,
+        imag_columns,
+        weights,
+        output_dir,
+        input_dir;
+        preserve_columns=preserve_columns,
+        verbose=verbose
+    )
+    
+    return result
 end

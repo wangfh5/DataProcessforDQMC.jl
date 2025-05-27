@@ -227,7 +227,6 @@ function MultiOrbitalStructureFactorAnalysis(k_point::Tuple{<:Real,<:Real}, orbi
                                            auto_digits::Bool=true, tolerance::Float64=1e-6, verbose::Bool=true)
     # Validate inputs
     @assert length(orbital_columns) == length(orbital_labels) "Number of orbital columns ($(length(orbital_columns))) must match number of orbital labels ($(length(orbital_labels)))"
-    
     @assert orbital_pair in orbital_labels "Orbital pair '$orbital_pair' not found in orbital_labels: $(join(orbital_labels, ", "))"
     
     # File reading and validation
@@ -385,47 +384,9 @@ function AFMStructureFactor(k_point::Tuple{<:Real,<:Real}=(0.0, 0.0), filename::
     end
     target_filepath = joinpath(filedir, filename)
     
-    # Check if target file exists, if not, generate it from source_file
+    # Check if target file exists, if not, report error
     if !isfile(target_filepath)
-        if verbose
-            println("Target file $filename not found. Generating from $source_file...")
-        end
-        
-        # Ensure source_file has .bin extension
-        if !endswith(source_file, ".bin")
-            source_file = source_file * ".bin"
-        end
-        
-        # Check if source file exists
-        source_filepath = joinpath(filedir, source_file)
-        if !isfile(source_filepath)
-            @error "Source file not found: $source_filepath"
-            return nothing
-        end
-        
-        # Generate target file using merge_staggered_components
-        # Use the same column indices for all file types
-        merge_staggered_components(
-            filename,            # Output filename
-            source_file,         # Input filename
-            filedir,            # Output directory
-            filedir;            # Input directory
-            real_columns=[3, 9, 5, 7],  # [AA, BB, AB, BA] real columns
-            imag_columns=[4, 10, 6, 8], # [AA, BB, AB, BA] imag columns
-            verbose=verbose
-        )
-        
-        # Verify the file was successfully generated
-        if !isfile(target_filepath)
-            @error "Failed to generate $filename from $source_file"
-            return nothing
-        end
-    end
-    
-    # Check if target file exists now
-    if !isfile(target_filepath)
-        @error "Target file not found: $target_filepath. Please provide a valid source_file to generate it."
-        return nothing
+        @error "Target file not found: $target_filepath"
     end
     
     # Analyze the structure factor file
@@ -503,46 +464,9 @@ function CDWStructureFactor(k_point::Tuple{<:Real,<:Real}=(0.0, 0.0), filename::
     end
     target_filepath = joinpath(filedir, filename)
     
-    # Check if target file exists, if not, generate it from source_file
+    # Check if target file exists, if not, report error
     if !isfile(target_filepath)
-        if verbose
-            println("Target file $filename not found. Generating from $source_file...")
-        end
-        
-        # Ensure source_file has .bin extension
-        if !endswith(source_file, ".bin")
-            source_file = source_file * ".bin"
-        end
-        
-        # Check if source file exists
-        source_filepath = joinpath(filedir, source_file)
-        if !isfile(source_filepath)
-            @error "Source file not found: $source_filepath"
-            return nothing
-        end
-        
-        # Generate target file using merge_uniform_components
-        merge_uniform_components(
-            filename,            # Output filename
-            source_file,         # Input filename
-            filedir,            # Output directory
-            filedir;            # Input directory
-            real_columns=[3, 9, 5, 7],  # [AA, BB, AB, BA] real columns
-            imag_columns=[4, 10, 6, 8], # [AA, BB, AB, BA] imag columns
-            verbose=verbose
-        )
-        
-        # Verify the file was successfully generated
-        if !isfile(target_filepath)
-            @error "Failed to generate $filename from $source_file"
-            return nothing
-        end
-    end
-    
-    # Check if target file exists now
-    if !isfile(target_filepath)
-        @error "Target file not found: $target_filepath. Please provide a valid source_file to generate it."
-        return nothing
+        error("Target file not found: $target_filepath")
     end
     
     # Analyze the structure factor file

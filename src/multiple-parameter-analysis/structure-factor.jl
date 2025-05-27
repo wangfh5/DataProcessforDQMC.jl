@@ -8,66 +8,6 @@ export analyze_structure_factor_multi_parameter,
        analyze_CDW_structure_factor_multi_parameter
 
 
-"""
-    try_combine_components(dir::AbstractString, source_file::String, i::Int, total_dirs::Int, verbose::Bool) -> Bool
-
-通用函数，尝试使用指定的合并函数创建目标文件。
-
-参数：
-- `dir`: 包含文件的目录
-- `source_file`: 要创建的源文件名
-- `i`: 当前目录索引（用于日志记录）
-- `total_dirs`: 目录总数（用于日志记录）
-- `verbose`: 是否输出详细信息
-
-返回值：
-- `Bool`: 合并是否成功
-"""
-function try_combine_components(dir::AbstractString, source_file::String, i::Int, total_dirs::Int, verbose::Bool)
-    if source_file == "ss_k.bin"
-        file1 = "spsm_k.bin"
-        file2 = "szsz_k.bin"
-        combiner_function = combine_ss_components
-    elseif source_file == "cdwpair_k.bin"
-        file1 = "cdw_k.bin"
-        file2 = "pair_onsite_k.bin"
-        combiner_function = combine_cdwpair_components
-    else
-        if verbose
-            println("($i/$total_dirs) 不支持的源文件: $source_file")
-        end
-        return false
-    end
-    
-    if verbose
-        println("($i/$total_dirs) 尝试使用数据 $file1 和 $file2 合并 $source_file...")
-    end
-
-    try
-        # 调用合并函数
-        result = combiner_function(source_file,file1,file2,dir,dir;verbose=false)
-        
-        # 检查结果
-        if result != ""
-            if verbose
-                println("($i/$total_dirs) 成功创建 $source_file")
-            end
-            return true
-        else
-            if verbose
-                println("($i/$total_dirs) 创建 $source_file 失败：返回空路径")
-            end
-            return false
-        end
-    catch e
-        if verbose
-            println("($i/$total_dirs) 创建 $source_file 失败: $e")
-        end
-        return false
-    end
-end
-
-
 # ---------------------------------------------------------------------------- #
 #                         Analysis of Structure Factor                         #
 # ---------------------------------------------------------------------------- #
@@ -164,25 +104,15 @@ function analyze_structure_factor_multi_parameter(analyzer_function::Function,
         # Extract parameters
         params = extract_parameters_from_dirname(dirname)
         
-        # 检查结构因子文件是否存在，如果不存在，检查源文件是否存在
+        # 检查结构因子文件是否存在
         filepath = joinpath(dir, filename)
-        source_filepath = joinpath(dir, source_file)
         
-        # 如果结构因子文件和源文件都不存在，尝试自动合并文件
-        if !isfile(filepath) && !isfile(source_filepath)
-            # 尝试自动合并文件
-            auto_combined = false
-            
-            # 根据源文件类型尝试不同的自动合并策略
-            auto_combined = try_combine_components(dir, source_file, i, total_dirs, verbose)
-            
-            # 如果自动合并失败，跳过此目录
-            if !auto_combined
-                if verbose
-                    println("($i/$total_dirs) 跳过 $dirname: 文件 $filename 和源文件 $source_file 都不存在或合并失败")
-                end
-                continue
+        # 如果文件不存在，直接跳过此目录
+        if !isfile(filepath)
+            if verbose
+                println("($i/$total_dirs) 跳过 $dirname: 文件 $filename 不存在")
             end
+            continue
         end
         
         try
