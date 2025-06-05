@@ -28,7 +28,7 @@ export analyze_structure_factor_multi_parameter,
                                            tolerance::Float64=1e-6, 
                                            verbose::Bool=false,
                                            filter_options::Union{Dict, NamedTuple}=Dict(),
-                                           pattern::Regex=r"^proj_fft_honeycomb") -> DataFrame
+                                           pattern::Regex=r"") -> DataFrame
 
 通用的多参数结构因子分析函数，可用于分析不同类型的结构因子。
 
@@ -48,7 +48,7 @@ export analyze_structure_factor_multi_parameter,
 - `tolerance::Float64=1e-6`: k点匹配容差
 - `verbose::Bool=false`: 是否显示详细信息
 - `filter_options::Union{Dict, NamedTuple}=Dict()`: 目录筛选选项，可包含:prefix、:b、:U等参数
-- `pattern::Regex=r"^proj_fft_honeycomb"`: 用于匹配目录名的正则表达式
+- `pattern::Regex=r""`: 用于匹配目录名的正则表达式
 
 # 返回值
 - `DataFrame`: 包含所有参数和分析结果的DataFrame
@@ -68,38 +68,43 @@ function analyze_structure_factor_multi_parameter(analyzer_function::Function,
                                            tolerance::Float64=1e-6, 
                                            verbose::Bool=false,
                                            filter_options::Union{Dict, NamedTuple}=Dict(),
-                                           pattern::Regex=r"^proj_fft_honeycomb")
-    # 扫描参数目录
+                                           pattern::Regex=r"")
+    # Scan parameter directories
     param_dirs_with_params = scan_parameter_directories(base_dir; filter_options=filter_options, pattern=pattern, return_params=true)
     
     if isempty(param_dirs_with_params)
-        @warn "未在 $base_dir 中找到参数目录"
+        @warn "No parameter directories found in $base_dir"
         return DataFrame()
     end
     
-    # 创建基本列的DataFrame
-    result_df = DataFrame(
-        # 参数
-        :directory => String[],
-        :prefix => String[],
-        :b => Float64[],
-        :U => Float64[],
-        :L => Int[],
-        :dtau => Float64[],
-        # Gutzwiller参数
-        :gw => Union{Float64, Missing}[],
-        :lprojgw => Union{Bool, Missing, Nothing}[]  # 允许 nothing 值
-    )
-    
-    # 添加动态结果列
-    for col in result_columns
-        result_col_name = Symbol(result_prefix * "_" * string(col))
-        result_df[!, result_col_name] = Float64[]
+    # Create a DataFrame with basic columns
+    result_df = DataFrame()
+
+    # Add parameter columns based on the first directory
+    first_dir, first_prefix, first_params_vector = first(param_dirs_with_params)
+    # Convert to dictionary format for compatibility
+    first_params = Dict{Symbol,Any}()
+    first_params[:prefix] = first_prefix
+    for (key, value, _) in first_params_vector
+        first_params[Symbol(key)] = value
     end
-    
+    # Add parameter columns to the DataFrame
+    for param_name in keys(first_params)
+        result_df[!, param_name] = typeof(first_params[param_name])[]
+    end
+
+    # Add result columns to the DataFrame
+    for col in result_columns
+        col_name = Symbol("$(result_prefix)_$(col)")
+        result_df[!, col_name] = Float64[]
+    end
+
+    # Add formatted result column
+    result_df[!, Symbol("$(result_prefix)_formatted")] = String[]
+
     # Process each directory
     total_dirs = length(param_dirs_with_params)
-    println("找到 $total_dirs 个参数目录进行分析...")
+    println("Found $total_dirs parameter directories to analyze...")
     
     for (i, (dir, prefix, params_vector)) in enumerate(param_dirs_with_params)
         dirname = basename(dir)
@@ -111,23 +116,20 @@ function analyze_structure_factor_multi_parameter(analyzer_function::Function,
             params[Symbol(key)] = value
         end
         
-        # 检查结构因子文件是否存在
+        # Check if the structure factor file exists
         filepath = joinpath(dir, filename)
-        
-        # 如果文件不存在，直接跳过此目录
         if !isfile(filepath) && !force_rebuild
             if verbose
-                println("($i/$total_dirs) 跳过 $dirname: 文件 $filename 不存在")
+                println("($i/$total_dirs) Skipping $dirname: file $filename does not exist")
             end
             continue
         end
         
         try
             if verbose
-                println("($i/$total_dirs) 分析 $dirname...")
+                println("($i/$total_dirs) Analyzing $dirname...")
             end
             
-            # 执行分析
             analysis_result = analyzer_function(
                 k_point, filename, dir;
                 force_rebuild=force_rebuild,
@@ -137,53 +139,46 @@ function analyze_structure_factor_multi_parameter(analyzer_function::Function,
                 dropmaxmin=dropmaxmin,
                 auto_digits=auto_digits, 
                 tolerance=tolerance,
-                verbose=false  # 自己处理输出
+                verbose=false  # Handle output yourself
             )
             
-            # 创建基本参数字典
-            row_dict = Dict(
-                :directory => dirname,
-                :prefix => params[:prefix],
-                :b => params[:b],
-                :U => params[:U],
-                :L => params[:L],
-                :dtau => params[:dtau],
-                # Gutzwiller parameters - use missing for non-existent values
-                :gw => get(params, :gw, missing),
-                :lprojgw => get(params, :lprojgw, nothing)  # 保持原始的 nothing 值
-            )
-            
-            # 添加分析结果
+            # Create a new row
+            row = Dict{Symbol, Any}()
+
+            # Add parameters to the row
+            for (param_name, param_value) in params
+                row[param_name] = param_value
+            end
+
+            # Add results to the row
             for col in result_columns
                 result_key = Symbol(result_prefix * "_" * string(col))
-                row_dict[result_key] = getproperty(analysis_result, col)
+                row[result_key] = getproperty(analysis_result, col)
             end
+
+            # Add formatted result to the row
+            row[Symbol("$(result_prefix)_formatted")] = analysis_result.formatted_real
             
-            # 添加行到DataFrame
-            push!(result_df, row_dict)
+            # Add row to DataFrame
+            push!(result_df, row)
             
             if verbose
-                println("($i/$total_dirs) 完成分析 $dirname")
+                println("($i/$total_dirs) Analysis of $dirname completed")
                 println("   $(result_prefix)($(k_point)) = $(getproperty(analysis_result, result_columns[1])) + $(getproperty(analysis_result, result_columns[3]))i")
             end
         catch e
-            println("($i/$total_dirs) 分析 $dirname 时出错: $e")
+            println("($i/$total_dirs) Error analyzing $dirname: $e")
         end
     end
     
     # Check if we have results
     if nrow(result_df) == 0
-        @warn "没有成功的分析结果"
+        @warn "No successful analysis results"
         return DataFrame()
     end
     
     # Sort by (b, U, L, dtau)
     sort!(result_df, [:b, :U, :L, :dtau])
-    
-    # Print column order (for debugging)
-    if verbose
-        println("DataFrame列顺序: $(names(result_df))")
-    end
     
     return result_df
 end
@@ -201,7 +196,7 @@ end
                                                tolerance::Float64=1e-6, 
                                                verbose::Bool=false,
                                                filter_options::Union{Dict, NamedTuple}=Dict(),
-                                               pattern::Regex=r"^proj_fft_honeycomb") -> DataFrame
+                                               pattern::Regex=r"") -> DataFrame
 
 对多个参数目录执行反铁磁结构因子分析，并将结果整合到一个DataFrame中。
 
@@ -218,7 +213,7 @@ end
 - `tolerance::Float64=1e-6`: k点匹配容差
 - `verbose::Bool=false`: 是否显示详细信息
 - `filter_options::Union{Dict, NamedTuple}=Dict()`: 目录筛选选项，可包含:prefix、:b、:U等参数
-- `pattern::Regex=r"^proj_fft_honeycomb"`: 用于匹配目录名的正则表达式
+- `pattern::Regex=r""`: 用于匹配目录名的正则表达式
 
 # 返回值
 - `DataFrame`: 包含所有参数和分析结果的DataFrame
@@ -235,7 +230,7 @@ function analyze_AFM_structure_factor_multi_parameter(base_dir::AbstractString=p
                                                    tolerance::Float64=1e-6, 
                                                    verbose::Bool=false,
                                                    filter_options::Union{Dict, NamedTuple}=Dict(),
-                                                   pattern::Regex=r"^proj_fft_honeycomb")
+                                                   pattern::Regex=r"")
     # 调用通用的结构因子分析函数，传递 AFMStructureFactor 函数和相应的参数
     return analyze_structure_factor_multi_parameter(
         AFMStructureFactor,
@@ -271,7 +266,7 @@ end
                                                tolerance::Float64=1e-6, 
                                                verbose::Bool=false,
                                                filter_options::Union{Dict, NamedTuple}=Dict(),
-                                               pattern::Regex=r"^proj_fft_honeycomb") -> DataFrame
+                                               pattern::Regex=r"") -> DataFrame
 
 对多个参数目录执行电荷密度波结构因子分析，并将结果整合到一个DataFrame中。
 
@@ -288,7 +283,7 @@ end
 - `tolerance::Float64=1e-6`: k点匹配容差
 - `verbose::Bool=false`: 是否显示详细信息
 - `filter_options::Union{Dict, NamedTuple}=Dict()`: 目录筛选选项，可包含:prefix、:b、:U等参数
-- `pattern::Regex=r"^proj_fft_honeycomb"`: 用于匹配目录名的正则表达式
+- `pattern::Regex=r""`: 用于匹配目录名的正则表达式
 
 # 返回值
 - `DataFrame`: 包含所有参数和分析结果的DataFrame
@@ -305,7 +300,7 @@ function analyze_CDW_structure_factor_multi_parameter(base_dir::AbstractString=p
                                                    tolerance::Float64=1e-6, 
                                                    verbose::Bool=false,
                                                    filter_options::Union{Dict, NamedTuple}=Dict(),
-                                                   pattern::Regex=r"^proj_fft_honeycomb")
+                                                   pattern::Regex=r"")
     # 调用通用的结构因子分析函数，传递 CDWStructureFactor 函数和相应的参数
     return analyze_structure_factor_multi_parameter(
         CDWStructureFactor,
