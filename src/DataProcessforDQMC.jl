@@ -6,6 +6,13 @@ using DelimitedFiles
 using DataFrames
 using CSV
 
+# 导入 JobManage 子模块
+include("JobManage/JobManage.jl")
+using .JobManage
+# 重新导出 JobManage 的核心函数，让用户直接使用
+export generate_jobname, parse_jobname, parse_jobname_legacy
+export migrate_legacy_to_new, verify_migration
+
 # Basis statistical functions
 include("statistics.jl")
 

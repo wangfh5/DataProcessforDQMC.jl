@@ -66,9 +66,9 @@ function analyze_correlation_ratio_multi_parameter(correlation_ratio_function::F
                                            filter_options::Union{Dict, NamedTuple}=Dict(),
                                            pattern::Regex=r"^proj_fft_honeycomb")
     # Scan parameter directories
-    param_dirs = scan_parameter_directories(base_dir; filter_options=filter_options, pattern=pattern)
+    param_dirs_with_params = scan_parameter_directories(base_dir; filter_options=filter_options, pattern=pattern, return_params=true)
     
-    if isempty(param_dirs)
+    if isempty(param_dirs_with_params)
         @warn "No parameter directories found in $(base_dir)"
         return DataFrame()
     end
@@ -77,9 +77,15 @@ function analyze_correlation_ratio_multi_parameter(correlation_ratio_function::F
     df = DataFrame()
     
     # Add parameter columns based on the first directory
-    params = extract_parameters_from_dirname(basename(first(param_dirs)))
-    for param_name in keys(params)
-        df[!, param_name] = typeof(params[param_name])[]
+    first_dir, first_prefix, first_params_vector = first(param_dirs_with_params)
+    # Convert to dictionary format for compatibility
+    first_params = Dict{Symbol,Any}()
+    first_params[:prefix] = first_prefix
+    for (key, value, _) in first_params_vector
+        first_params[Symbol(key)] = value
+    end
+    for param_name in keys(first_params)
+        df[!, param_name] = typeof(first_params[param_name])[]
     end
     
     # Add result columns
@@ -92,10 +98,14 @@ function analyze_correlation_ratio_multi_parameter(correlation_ratio_function::F
     df[!, Symbol("$(result_prefix)_formatted")] = String[]
     
     # Process each parameter directory
-    for dir_path in param_dirs
+    for (dir_path, prefix, params_vector) in param_dirs_with_params
         dir_name = basename(dir_path)
-        # Extract parameters
-        params = extract_parameters_from_dirname(dir_name)
+        # Convert params_vector to dictionary format for compatibility
+        params = Dict{Symbol,Any}()
+        params[:prefix] = prefix
+        for (key, value, _) in params_vector
+            params[Symbol(key)] = value
+        end
         
         # Analyze correlation ratio
         try
@@ -137,7 +147,7 @@ function analyze_correlation_ratio_multi_parameter(correlation_ratio_function::F
     end
     
     # Sort DataFrame by parameters
-    sort!(df, [:b, :U, :gw])
+    sort!(df, [:b, :U, :L, :dtau])
     
     return df
 end

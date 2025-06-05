@@ -70,9 +70,9 @@ function analyze_structure_factor_multi_parameter(analyzer_function::Function,
                                            filter_options::Union{Dict, NamedTuple}=Dict(),
                                            pattern::Regex=r"^proj_fft_honeycomb")
     # 扫描参数目录
-    param_dirs = scan_parameter_directories(base_dir; filter_options=filter_options, pattern=pattern)
+    param_dirs_with_params = scan_parameter_directories(base_dir; filter_options=filter_options, pattern=pattern, return_params=true)
     
-    if isempty(param_dirs)
+    if isempty(param_dirs_with_params)
         @warn "未在 $base_dir 中找到参数目录"
         return DataFrame()
     end
@@ -98,20 +98,24 @@ function analyze_structure_factor_multi_parameter(analyzer_function::Function,
     end
     
     # Process each directory
-    total_dirs = length(param_dirs)
+    total_dirs = length(param_dirs_with_params)
     println("找到 $total_dirs 个参数目录进行分析...")
     
-    for (i, dir) in enumerate(param_dirs)
+    for (i, (dir, prefix, params_vector)) in enumerate(param_dirs_with_params)
         dirname = basename(dir)
         
-        # Extract parameters
-        params = extract_parameters_from_dirname(dirname)
+        # Convert params_vector to dictionary format for compatibility
+        params = Dict{Symbol,Any}()
+        params[:prefix] = prefix
+        for (key, value, _) in params_vector
+            params[Symbol(key)] = value
+        end
         
         # 检查结构因子文件是否存在
         filepath = joinpath(dir, filename)
         
         # 如果文件不存在，直接跳过此目录
-        if !isfile(filepath)
+        if !isfile(filepath) && !force_rebuild
             if verbose
                 println("($i/$total_dirs) 跳过 $dirname: 文件 $filename 不存在")
             end

@@ -5,3 +5,6 @@
 /docs/Manifest.toml
 /docs/build/
 /memory-bank/
+/examples/Exact*/
+/.windsurf/
+/.cursor/
