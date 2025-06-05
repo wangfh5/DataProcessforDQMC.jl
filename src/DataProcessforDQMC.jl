@@ -12,6 +12,7 @@ using .JobManage
 # 重新导出 JobManage 的核心函数，让用户直接使用
 export generate_jobname, parse_jobname, parse_jobname_legacy
 export migrate_legacy_to_new, verify_migration
+export SimulationInfo, save_simulation_info
 
 # Basis statistical functions
 include("statistics.jl")
