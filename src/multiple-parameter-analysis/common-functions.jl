@@ -21,7 +21,6 @@ export scan_parameter_directories,
 """
     scan_parameter_directories(base_dir::AbstractString=pwd(); 
                               filter_options::Union{Dict, NamedTuple}=Dict(), 
-                              pattern::Regex=r"^proj_fft_honeycomb",
                               return_params::Bool=false) -> Union{Vector{String}, Vector{Tuple{String,String,Vector{Tuple{String,Any,Int}}}}}
 
 扫描指定目录下所有符合筛选条件的子目录。
@@ -32,7 +31,6 @@ export scan_parameter_directories,
   - `"prefix"` 或 `:prefix`: 目录前缀（字符串或字符串数组）
   - `"b"`, `"U"`, `"L"`, `"dtau"`, `"gw"` 等: 参数范围（可以是单个值、范围或值数组）
   - `"lprojgw"`: 布尔值，是否使用lprojgw
-- `pattern::Regex=r"^proj_fft_honeycomb"`: 用于额外匹配目录名的正则表达式
 - `return_params::Bool=false`: 是否同时返回解析的参数信息
 
 # 返回值
@@ -53,7 +51,6 @@ dirs_with_params = scan_parameter_directories(
 """
 function scan_parameter_directories(base_dir::AbstractString=pwd(); 
                                    filter_options::Union{Dict, NamedTuple}=Dict(), 
-                                   pattern::Regex=r"^proj_fft_honeycomb",
                                    return_params::Bool=false)
     result_dirs = String[]
     result_params = Vector{Tuple{String,String,Vector{Tuple{String,Any,Int}}}}()
@@ -68,11 +65,6 @@ function scan_parameter_directories(base_dir::AbstractString=pwd();
     for entry in entries
         if isdir(entry)
             dirname = basename(entry)
-            
-            # 应用正则表达式筛选（如果提供）
-            if !isempty(pattern.pattern) && match(pattern, dirname) === nothing
-                continue
-            end
             
             # 直接使用parse_jobname解析参数
             prefix = ""

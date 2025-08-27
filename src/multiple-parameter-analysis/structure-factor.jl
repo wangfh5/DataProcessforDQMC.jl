@@ -27,8 +27,7 @@ export analyze_structure_factor_multi_parameter,
                                            auto_digits::Bool=true, 
                                            tolerance::Float64=1e-6, 
                                            verbose::Bool=false,
-                                           filter_options::Union{Dict, NamedTuple}=Dict(),
-                                           pattern::Regex=r"") -> DataFrame
+                                           filter_options::Union{Dict, NamedTuple}=Dict()) -> DataFrame
 
 通用的多参数结构因子分析函数，可用于分析不同类型的结构因子。
 
@@ -48,7 +47,6 @@ export analyze_structure_factor_multi_parameter,
 - `tolerance::Float64=1e-6`: k点匹配容差
 - `verbose::Bool=false`: 是否显示详细信息
 - `filter_options::Union{Dict, NamedTuple}=Dict()`: 目录筛选选项，可包含:prefix、:b、:U等参数
-- `pattern::Regex=r""`: 用于匹配目录名的正则表达式
 
 # 返回值
 - `DataFrame`: 包含所有参数和分析结果的DataFrame
@@ -67,10 +65,9 @@ function analyze_structure_factor_multi_parameter(analyzer_function::Function,
                                            auto_digits::Bool=true, 
                                            tolerance::Float64=1e-6, 
                                            verbose::Bool=false,
-                                           filter_options::Union{Dict, NamedTuple}=Dict(),
-                                           pattern::Regex=r"")
+                                           filter_options::Union{Dict, NamedTuple}=Dict())
     # Scan parameter directories
-    param_dirs_with_params = scan_parameter_directories(base_dir; filter_options=filter_options, pattern=pattern, return_params=true)
+    param_dirs_with_params = scan_parameter_directories(base_dir; filter_options=filter_options, return_params=true)
     
     if isempty(param_dirs_with_params)
         @warn "No parameter directories found in $base_dir"
@@ -195,8 +192,7 @@ end
                                                auto_digits::Bool=true, 
                                                tolerance::Float64=1e-6, 
                                                verbose::Bool=false,
-                                               filter_options::Union{Dict, NamedTuple}=Dict(),
-                                               pattern::Regex=r"") -> DataFrame
+                                               filter_options::Union{Dict, NamedTuple}=Dict()) -> DataFrame
 
 对多个参数目录执行反铁磁结构因子分析，并将结果整合到一个DataFrame中。
 
@@ -229,8 +225,7 @@ function analyze_AFM_structure_factor_multi_parameter(base_dir::AbstractString=p
                                                    auto_digits::Bool=true, 
                                                    tolerance::Float64=1e-6, 
                                                    verbose::Bool=false,
-                                                   filter_options::Union{Dict, NamedTuple}=Dict(),
-                                                   pattern::Regex=r"")
+                                                   filter_options::Union{Dict, NamedTuple}=Dict())
     # 调用通用的结构因子分析函数，传递 AFMStructureFactor 函数和相应的参数
     return analyze_structure_factor_multi_parameter(
         AFMStructureFactor,
@@ -247,8 +242,7 @@ function analyze_AFM_structure_factor_multi_parameter(base_dir::AbstractString=p
         auto_digits=auto_digits,
         tolerance=tolerance,
         verbose=verbose,
-        filter_options=filter_options,
-        pattern=pattern
+        filter_options=filter_options
     )
 end
 
@@ -265,8 +259,7 @@ end
                                                auto_digits::Bool=true, 
                                                tolerance::Float64=1e-6, 
                                                verbose::Bool=false,
-                                               filter_options::Union{Dict, NamedTuple}=Dict(),
-                                               pattern::Regex=r"") -> DataFrame
+                                               filter_options::Union{Dict, NamedTuple}=Dict()) -> DataFrame
 
 对多个参数目录执行电荷密度波结构因子分析，并将结果整合到一个DataFrame中。
 
@@ -283,7 +276,6 @@ end
 - `tolerance::Float64=1e-6`: k点匹配容差
 - `verbose::Bool=false`: 是否显示详细信息
 - `filter_options::Union{Dict, NamedTuple}=Dict()`: 目录筛选选项，可包含:prefix、:b、:U等参数
-- `pattern::Regex=r""`: 用于匹配目录名的正则表达式
 
 # 返回值
 - `DataFrame`: 包含所有参数和分析结果的DataFrame
@@ -299,8 +291,7 @@ function analyze_CDW_structure_factor_multi_parameter(base_dir::AbstractString=p
                                                    auto_digits::Bool=true, 
                                                    tolerance::Float64=1e-6, 
                                                    verbose::Bool=false,
-                                                   filter_options::Union{Dict, NamedTuple}=Dict(),
-                                                   pattern::Regex=r"")
+                                                   filter_options::Union{Dict, NamedTuple}=Dict())
     # 调用通用的结构因子分析函数，传递 CDWStructureFactor 函数和相应的参数
     return analyze_structure_factor_multi_parameter(
         CDWStructureFactor,
@@ -317,7 +308,6 @@ function analyze_CDW_structure_factor_multi_parameter(base_dir::AbstractString=p
         auto_digits=auto_digits,
         tolerance=tolerance,
         verbose=verbose,
-        filter_options=filter_options,
-        pattern=pattern
+        filter_options=filter_options
     )
 end

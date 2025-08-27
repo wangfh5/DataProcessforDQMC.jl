@@ -23,8 +23,7 @@ export analyze_correlation_ratio_multi_parameter,
                                            auto_digits::Bool=true,
                                            tolerance::Float64=1e-6,
                                            verbose::Bool=false,
-                                           filter_options::Union{Dict, NamedTuple}=Dict(),
-                                           pattern::Regex=r"^proj_fft_honeycomb") -> DataFrame
+                                           filter_options::Union{Dict, NamedTuple}=Dict()) -> DataFrame
 
 Generic multi-parameter correlation ratio analysis function, suitable for analyzing different types of correlation ratios.
 
@@ -44,7 +43,6 @@ Generic multi-parameter correlation ratio analysis function, suitable for analyz
 - `tolerance::Float64`: Tolerance for matching k-points (default: 1e-6)
 - `verbose::Bool`: Whether to output detailed information (default: false)
 - `filter_options::Union{Dict, NamedTuple}`: Options for filtering parameter directories (default: empty Dict)
-- `pattern::Regex`: Pattern for matching parameter directories (default: r"^proj_fft_honeycomb")
 
 # Returns
 - `DataFrame`: DataFrame containing parameters and correlation ratio results
@@ -63,10 +61,9 @@ function analyze_correlation_ratio_multi_parameter(correlation_ratio_function::F
                                            auto_digits::Bool=true,
                                            tolerance::Float64=1e-6,
                                            verbose::Bool=false,
-                                           filter_options::Union{Dict, NamedTuple}=Dict(),
-                                           pattern::Regex=r"^proj_fft_honeycomb")
+                                           filter_options::Union{Dict, NamedTuple}=Dict())
     # Scan parameter directories
-    param_dirs_with_params = scan_parameter_directories(base_dir; filter_options=filter_options, pattern=pattern, return_params=true)
+    param_dirs_with_params = scan_parameter_directories(base_dir; filter_options=filter_options, return_params=true)
     
     if isempty(param_dirs_with_params)
         @warn "No parameter directories found in $(base_dir)"
@@ -183,7 +180,6 @@ Analyze AFM correlation ratio across multiple parameter directories.
 - `tolerance::Float64`: Tolerance for matching k-points (default: 1e-6)
 - `verbose::Bool`: Whether to output detailed information (default: false)
 - `filter_options::Union{Dict, NamedTuple}`: Options for filtering parameter directories (default: empty Dict)
-- `pattern::Regex`: Pattern for matching parameter directories (default: r"^proj_fft_honeycomb")
 
 # Returns
 - `DataFrame`: DataFrame containing parameters and AFM correlation ratio results
@@ -199,8 +195,7 @@ function analyze_AFM_correlation_ratio_multi_parameter(base_dir::AbstractString=
                                                auto_digits::Bool=true,
                                                tolerance::Float64=1e-6,
                                                verbose::Bool=false,
-                                               filter_options::Union{Dict, NamedTuple}=Dict(),
-                                               pattern::Regex=r"^proj_fft_honeycomb")
+                                               filter_options::Union{Dict, NamedTuple}=Dict())
     return analyze_correlation_ratio_multi_parameter(
         AFMCorrelationRatio,
         base_dir;
@@ -216,8 +211,7 @@ function analyze_AFM_correlation_ratio_multi_parameter(base_dir::AbstractString=
         auto_digits=auto_digits,
         tolerance=tolerance,
         verbose=verbose,
-        filter_options=filter_options,
-        pattern=pattern
+        filter_options=filter_options
     )
 end
 
@@ -251,7 +245,6 @@ Analyze CDW correlation ratio across multiple parameter directories.
 - `tolerance::Float64`: Tolerance for matching k-points (default: 1e-6)
 - `verbose::Bool`: Whether to output detailed information (default: false)
 - `filter_options::Union{Dict, NamedTuple}`: Options for filtering parameter directories (default: empty Dict)
-- `pattern::Regex`: Pattern for matching parameter directories (default: r"^proj_fft_honeycomb")
 
 # Returns
 - `DataFrame`: DataFrame containing parameters and CDW correlation ratio results
@@ -267,8 +260,7 @@ function analyze_CDW_correlation_ratio_multi_parameter(base_dir::AbstractString=
                                                auto_digits::Bool=true,
                                                tolerance::Float64=1e-6,
                                                verbose::Bool=false,
-                                               filter_options::Union{Dict, NamedTuple}=Dict(),
-                                               pattern::Regex=r"^proj_fft_honeycomb")
+                                               filter_options::Union{Dict, NamedTuple}=Dict())
     return analyze_correlation_ratio_multi_parameter(
         CDWCorrelationRatio,
         base_dir;
@@ -284,7 +276,6 @@ function analyze_CDW_correlation_ratio_multi_parameter(base_dir::AbstractString=
         auto_digits=auto_digits,
         tolerance=tolerance,
         verbose=verbose,
-        filter_options=filter_options,
-        pattern=pattern
+        filter_options=filter_options
     )
 end
