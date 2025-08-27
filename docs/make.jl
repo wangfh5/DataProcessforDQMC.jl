@@ -14,6 +14,8 @@ makedocs(;
     ),
     pages=[
         "Home" => "index.md",
+        "预编译指南" => "precompilation.md",
+        "Parameter Analysis" => "parameter_analysis.md",
     ],
 )
 
