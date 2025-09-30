@@ -35,15 +35,6 @@ results = analyze_AFM_structure_factor_multi_parameter(
 )
 ```
 
-### 预编译加速
-```bash
-# 构建预编译镜像
-julia --project=. scripts/build_sysimage.jl
-
-# 快速启动（毫秒级）
-jd  # 启动预编译版本
-```
-
 ## 📚 文档
 
 - 📖 **[完整文档](https://wangfh5.github.io/DataProcessforDQMC.jl/stable/)**
@@ -56,10 +47,3 @@ jd  # 启动预编译版本
 julia> ]
 pkg> add https://github.com/wangfh5/DataProcessforDQMC.jl
 ```
-
-## 📊 主要应用场景
-
-- **强关联电子系统**研究
-- **量子相变**分析
-- **蜂窝晶格**和其他二维系统
-- **反铁磁/超导**竞争态研究

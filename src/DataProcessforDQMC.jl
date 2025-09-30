@@ -14,6 +14,10 @@ export generate_jobname, parse_jobname, parse_jobname_legacy
 export migrate_legacy_to_new, verify_migration
 export SimulationInfo, save_simulation_info
 
+# Package compilation support
+include("packagecompile/compile.jl")
+export compile, @Algorithm_str, Algorithm
+
 # Basis statistical functions
 include("statistics.jl")
 

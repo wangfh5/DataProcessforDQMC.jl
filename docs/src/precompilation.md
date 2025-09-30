@@ -64,56 +64,50 @@ Pkg.develop(path="/path/to/DataProcessforDQMC")
 
 ## 📦 构建系统镜像
 
-在项目根目录执行：
+启动 Julia 并执行：
 
-```bash
-cd /path/to/DataProcessforDQMC
-julia --project=. scripts/build_sysimage.jl
+```julia
+using DataProcessforDQMC, PackageCompiler
+DataProcessforDQMC.compile()
 ```
 
-这将生成 `DataProcessforDQMC_sys.so` 系统镜像文件（约380MB）。
+这将在 `~/.julia/sysimages/` 目录下生成 `sys_dataprocessfordqmc.so` 系统镜像文件（约380MB），并自动显示使用说明。
 
 !!! note "编译时间"
     首次编译可能需要1-2分钟，请耐心等待。
 
 ## ⚙️ 配置Julia启动器
 
-将以下配置添加到您的 `~/.bashrc` 文件中：
+将以下配置添加到您的 `~/.bashrc` 或 `~/.zshrc` 文件中：
 
 ```bash
 # DataProcessforDQMC 预编译镜像启动器
-function julia_dqmc() {
-    local sysimage_path="/path/to/DataProcessforDQMC/DataProcessforDQMC_sys.so"
-    
-    if [ ! -f "$sysimage_path" ]; then
-        echo "Error: system image file not found: $sysimage_path"
+function jd() {
+    local sysimage="$HOME/.julia/sysimages/sys_dataprocessfordqmc.so"
+
+    if [ ! -f "$sysimage" ]; then
+        echo "Error: system image file not found: $sysimage"
         return 1
     fi
-    
-    export JULIA_DQMC_SESSION=true
-    
+
     if [ $# -eq 0 ]; then
+        # 无参数：启动交互式会话并自动加载包
         echo "Starting DataProcessforDQMC interactive session..."
-        julia -J"$sysimage_path" -e "using DataProcessforDQMC" -i
+        julia --sysimage "$sysimage" -e 'using DataProcessforDQMC' -i
     else
-        julia -J"$sysimage_path" "$@"
+        # 有参数：运行脚本或传递其他参数
+        julia --sysimage "$sysimage" "$@"
     fi
-    
-    unset JULIA_DQMC_SESSION
 }
 
-# 快捷命令
-alias jd='julia_dqmc'        # 预编译版本
-alias jdd="julia -e \"using DataProcessforDQMC\" -i "  # 开发版本
+# 开发版本（不使用系统镜像，实时加载代码修改）
+alias jdd="julia -e 'using DataProcessforDQMC' -i"
 ```
 
 然后重新加载配置：
 ```bash
-source ~/.bashrc
+source ~/.bashrc  # 或 source ~/.zshrc
 ```
-
-!!! tip "路径配置"
-    请将 `/path/to/DataProcessforDQMC` 替换为实际的项目路径。
 
 ## 🎯 使用方式
 
@@ -137,18 +131,18 @@ jdd  # 使用开发版本（实时加载代码修改）
 以下情况需要重新编译系统镜像：
 
 1. **代码修改**：修改了DataProcessforDQMC包的源代码
-2. **依赖更新**：更新了包的依赖项  
+2. **依赖更新**：更新了包的依赖项
 3. **Julia版本升级**：升级了Julia版本
 4. **函数签名变更**：修改了公共API函数的参数
 
 重新编译命令：
-```bash
-cd /path/to/DataProcessforDQMC
-julia --project=. scripts/build_sysimage.jl
+```julia
+using DataProcessforDQMC, PackageCompiler
+DataProcessforDQMC.compile()
 ```
 
 !!! warning "代码修改后"
-    每次修改源代码后都需要重新编译系统镜像，否则修改不会生效。
+    每次修改源代码后都需要重新编译系统镜像，否则修改不会生效。开发调试时建议使用 `jdd` 命令，它会实时加载代码修改。
 
 ## 💡 性能对比
 
@@ -195,24 +189,22 @@ dirs = scan_parameter_directories(
 ### 系统镜像损坏
 如果遇到奇怪的错误，尝试重新编译：
 ```bash
-rm DataProcessforDQMC_sys.so
-julia --project=. scripts/build_sysimage.jl
+rm ~/.julia/sysimages/sys_dataprocessfordqmc.so
+```
+然后重新运行：
+```julia
+using DataProcessforDQMC, PackageCompiler
+DataProcessforDQMC.compile()
 ```
 
 ### 路径问题
-确保 `.bashrc` 中的路径指向正确的系统镜像文件：
+确认系统镜像文件已正确生成：
 ```bash
-ls -la /path/to/DataProcessforDQMC/DataProcessforDQMC_sys.so
+ls -la ~/.julia/sysimages/sys_dataprocessfordqmc.so
 ```
 
-### 权限问题
-确保系统镜像文件有执行权限：
-```bash
-chmod +x DataProcessforDQMC_sys.so
-```
-
-### PackageCompiler问题
-如果编译失败，可能需要安装或更新PackageCompiler：
+### PackageCompiler未安装
+如果编译失败，可能需要安装PackageCompiler：
 ```julia
 using Pkg
 Pkg.add("PackageCompiler")
