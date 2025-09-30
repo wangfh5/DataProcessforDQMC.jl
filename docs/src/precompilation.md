@@ -2,6 +2,66 @@
 
 为了获得最佳的启动速度和性能，DataProcessforDQMC支持预编译系统镜像。预编译后的Julia启动时间从数秒缩短到毫秒级。
 
+## 🚀 前置准备（首次使用）
+
+如果您还没有安装Julia，请按照以下步骤操作：
+
+### 1. 安装Julia
+
+使用juliaup安装器（官方推荐）：
+
+```bash
+curl -fsSL https://install.julialang.org | sh
+```
+
+安装完成后，重新加载shell配置：
+```bash
+source ~/.bashrc  # 或 source ~/.zshrc
+```
+
+验证安装：
+```bash
+julia --version
+```
+
+### 2. 安装PackageCompiler
+
+启动Julia REPL并安装PackageCompiler包：
+
+```bash
+julia
+```
+
+在Julia REPL中执行：
+```julia
+using Pkg
+Pkg.add("PackageCompiler")
+```
+
+### 3. 安装DataProcessforDQMC包到全局环境
+
+在Julia REPL中安装本地包到全局环境：
+
+```bash
+julia
+```
+
+在Julia REPL中执行：
+
+```julia
+using Pkg
+
+# 方式1：仅使用（推荐）
+Pkg.add(path="/path/to/DataProcessforDQMC")
+
+# 方式2：开发模式（如需修改源代码）
+Pkg.develop(path="/path/to/DataProcessforDQMC")
+```
+
+!!! tip "安装方式选择"
+    - 使用 `Pkg.add()` 如果您只需要使用这个包
+    - 使用 `Pkg.develop()` 如果您需要修改包的源代码
+
 ## 📦 构建系统镜像
 
 在项目根目录执行：
