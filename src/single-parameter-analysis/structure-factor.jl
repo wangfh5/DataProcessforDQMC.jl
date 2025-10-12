@@ -18,36 +18,6 @@ export AFMStructureFactor, CDWStructureFactor
 # ----------------- Helper functions for structure factor analysis ---------------- #
 
 """
-    find_closest_k_point(k_points, target_k, tolerance)
-
-在k点集合中找到最接近目标k点的坐标。
-
-参数:
-- `k_points`: 包含k点坐标的元组构成的向量 [(kx1, ky1), (kx2, ky2), ...]
-- `target_k`: 目标k点 (kx, ky)
-- `tolerance`: 匹配k点时的容差
-
-返回:
-- 最接近的k点坐标 (kx, ky)
-- 是否为精确匹配
-- 距离目标k点的距离
-"""
-function find_closest_k_point(k_points::Vector{<:Tuple{<:Real,<:Real}}, target_k::Tuple{<:Real,<:Real}, tolerance::Float64)
-    # 计算每个k点与目标k点的距离
-    distances = [(kx, ky, sqrt((kx - target_k[1])^2 + (ky - target_k[2])^2)) for (kx, ky) in k_points]
-    
-    # 按距离排序
-    sort!(distances, by = x -> x[3])
-    
-    # 检查最接近的点是否在容差范围内
-    closest_k = (distances[1][1], distances[1][2])
-    exact_match = distances[1][3] <= tolerance
-    
-    # 返回最接近的k点、是否精确匹配、距离
-    return closest_k, exact_match, distances[1][3]
-end
-
-"""
     print_structure_factor_result(k_point, mean_real, mean_imag, err_real, err_imag, 
                                  formatted_real, formatted_imag, filename, orbital="")
 

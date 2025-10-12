@@ -8,10 +8,11 @@
 3. 以线性叠加的方式合并数据文件的不同列为单列 （merge）
     3.1 两轨道交错合并（merge_staggered_components）
     3.2 两轨道均匀合并（merge_uniform_components）
+4. 提取特定坐标的所有bin数据 （filter）
 =#
 
 # 导出函数
-export combine_bin_files, scale_bin_columns, merge_bin_columns
+export combine_bin_files, scale_bin_columns, merge_bin_columns, filter_bin_file
 export merge_staggered_components, merge_uniform_components
 
 # ---------------------------------------------------------------------------- #
@@ -636,4 +637,164 @@ function merge_uniform_components(
     )
     
     return result
+end
+
+# ---------------------------------------------------------------------------- #
+#                      Filter functions for bin files                          #
+# ---------------------------------------------------------------------------- #
+
+"""
+    filter_bin_file(
+        input_filename::String,
+        coordinate::Union{Tuple{Int, Int}, Tuple{Float64, Float64}};
+        output_filename::Union{String, Nothing}=nothing,
+        dir::String=pwd(),
+        tolerance::Float64=1e-6,
+        verbose::Bool=false
+    )
+
+Extract all bin data for a specific coordinate from a bin file.
+
+This function filters a bin file to extract only the rows corresponding to a specific 
+coordinate across all bins. The coordinate can be either:
+- k-space (momentum): Tuple{Float64, Float64}, e.g., (0.5, 0.5)
+- r-space (real space): Tuple{Int, Int}, e.g., (1, 2)
+
+# Arguments
+- `input_filename::String`: Input .bin file (e.g., "nn_k.bin", "nn_r.bin")
+- `coordinate::Union{Tuple{Int, Int}, Tuple{Float64, Float64}}`: Target coordinate
+- `output_filename::Union{String, Nothing}=nothing`: Output .bin file name. If nothing, auto-generate from coordinate
+- `dir::String=pwd()`: Working directory
+- `tolerance::Float64=1e-6`: Tolerance for k-space coordinate matching (ignored for r-space)
+- `verbose::Bool=false`: Whether to print verbose information
+
+# Returns
+- `String`: Path to output file, or empty string if failed
+
+# Examples
+```julia
+# Filter k-space data for k=(π,π)
+filter_bin_file("nn_k.bin", (0.5, 0.5), dir="/path/to/data")
+# Output: nn_k_0.500_0.500.bin
+
+# Filter r-space data for r=(1, 2)
+filter_bin_file("nn_r.bin", (1, 2), dir="/path/to/data")
+# Output: nn_r_1_2.bin
+
+# Custom output filename
+filter_bin_file("afm_sf_k.bin", (0.5, 0.5), output_filename="afm_pi_pi.bin")
+```
+"""
+function filter_bin_file(
+    input_filename::String,
+    coordinate::Union{Tuple{Int, Int}, Tuple{Float64, Float64}};
+    output_filename::Union{String, Nothing}=nothing,
+    dir::String=pwd(),
+    tolerance::Float64=1e-6,
+    verbose::Bool=false
+)
+    # Construct input path
+    input_path = joinpath(dir, input_filename)
+    if !isfile(input_path)
+        @error "Input file not found: $input_path"
+        return ""
+    end
+    
+    # Read the bin file
+    if verbose
+        println("Reading file: $input_path")
+    end
+    data = readdlm(input_path)
+    
+    # Extract unique coordinates (first two columns)
+    coords = unique(data[:, 1:2], dims=1)
+    n_coords = size(coords, 1)
+    n_bins = size(data, 1) ÷ n_coords
+    
+    if verbose
+        println("File structure:")
+        println("  Total rows: $(size(data, 1))")
+        println("  Unique coordinates: $n_coords")
+        println("  Number of bins: $n_bins")
+        println("  Columns: $(size(data, 2))")
+    end
+    
+    # Find the coordinate index
+    coord_idx, is_exact = find_coordinate_index(coords, coordinate, tolerance)
+    
+    if isnothing(coord_idx)
+        @error "Coordinate $coordinate not found in the file"
+        return ""
+    end
+    
+    if verbose
+        if coordinate isa Tuple{Int, Int}
+            println("Found r-space coordinate: $coordinate at index $coord_idx")
+        else
+            matched_coord = (coords[coord_idx, 1], coords[coord_idx, 2])
+            if is_exact
+                println("Found exact k-space match: $coordinate at index $coord_idx")
+            else
+                dist = sqrt((matched_coord[1] - coordinate[1])^2 + (matched_coord[2] - coordinate[2])^2)
+                println("Found closest k-space coordinate: $matched_coord (distance: $dist) at index $coord_idx")
+                @warn "No exact match found within tolerance $tolerance, using closest point"
+            end
+        end
+    end
+    
+    # Extract rows for this coordinate across all bins
+    # Row indices: coord_idx, coord_idx + n_coords, coord_idx + 2*n_coords, ...
+    filtered_rows = [coord_idx + i * n_coords for i in 0:(n_bins-1)]
+    filtered_data = data[filtered_rows, :]
+    
+    # Generate output filename if not provided
+    if isnothing(output_filename)
+        base_name = replace(input_filename, ".bin" => "")
+        if coordinate isa Tuple{Int, Int}
+            # R-space: use integer format
+            output_filename = "$(base_name)_$(coordinate[1])_$(coordinate[2]).bin"
+        else
+            # K-space: use float format with 3 decimal places
+            coord_str1 = @sprintf("%.3f", coordinate[1])
+            coord_str2 = @sprintf("%.3f", coordinate[2])
+            output_filename = "$(base_name)_$(coord_str1)_$(coord_str2).bin"
+        end
+    end
+    
+    # Ensure .bin extension
+    if !endswith(output_filename, ".bin")
+        output_filename = output_filename * ".bin"
+    end
+    
+    output_path = joinpath(dir, output_filename)
+    
+    # Write filtered data to output file
+    if verbose
+        println("Writing $(size(filtered_data, 1)) rows to: $output_path")
+    end
+    
+    open(output_path, "w") do io
+        for i in 1:size(filtered_data, 1)
+            for j in 1:size(filtered_data, 2)
+                val = filtered_data[i, j]
+                if isa(val, AbstractFloat)
+                    # Use Fortran-compatible format
+                    formatted = @sprintf("%16.8e", val)
+                    write(io, formatted)
+                else
+                    formatted = @sprintf("%16s", string(val))
+                    write(io, formatted)
+                end
+            end
+            write(io, "\n")
+        end
+    end
+    
+    if verbose
+        println("Filter completed successfully")
+        println("Output file: $output_path")
+        println("Extracted $n_bins bins for coordinate $coordinate")
+    end
+    
+    return output_path
 end

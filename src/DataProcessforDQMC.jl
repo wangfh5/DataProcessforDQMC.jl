@@ -6,6 +6,9 @@ using DelimitedFiles
 using DataFrames
 using CSV
 
+# Utility functions
+include("utilities.jl")
+
 # 导入 JobManage 子模块
 include("JobManage/JobManage.jl")
 using .JobManage

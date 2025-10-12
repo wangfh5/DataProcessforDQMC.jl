@@ -62,7 +62,7 @@ function afm_k_files_generation(dir::AbstractString=pwd(); afm_source::String="s
             verbose && println("⚠  生成 ss_k.bin 失败")
         end
         
-        # 2. 生成afm_sf_k.bin
+        # 2. 生成afm_sf_k.bin (利用指定文件afm_source)
         verbose && println("\n正在生成 afm_sf_k.bin...")
         afm_sf_path = merge_afm_sf("afm_sf_k.bin", afm_source, dir, dir; verbose=false)
         if isfile(afm_sf_path)
