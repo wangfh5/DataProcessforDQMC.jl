@@ -10,6 +10,7 @@ Documentation for [DataProcessforDQMC](https://github.com/wangfh5/DataProcessfor
 
 - [预编译系统镜像指南](@ref precompilation_guide)
 - [Parameter Analysis Guide](@ref parameter_analysis)
+- [Bin Analysis 与数据处理指南](@ref bin_analysis_guide)
 
 ## API Reference
 
@@ -23,7 +24,8 @@ Order = [:function, :type]
 ```@contents
 Pages = [
     "precompilation.md",
-    "parameter_analysis.md"
+    "parameter_analysis.md",
+    "bin_analysis.md"
 ]
 ```
 

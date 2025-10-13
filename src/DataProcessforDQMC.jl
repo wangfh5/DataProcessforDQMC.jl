@@ -30,6 +30,7 @@ include("read-dataframes.jl")
 
 # Data processing utilities
 include("data-processing/bin-file-operations-basic.jl")
+include("data-processing/bin-file-export.jl")
 include("data-processing/derived-bin-generation.jl")
 include("data-processing/derived-bin-generation-afm.jl")
 include("data-processing/derived-bin-generation-cdwpair.jl")

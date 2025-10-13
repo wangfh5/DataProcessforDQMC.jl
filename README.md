@@ -41,6 +41,10 @@ results = analyze_AFM_structure_factor_multi_parameter(
 - ⚡ **[预编译指南](docs/src/precompilation.md)** - 系统镜像构建和使用
 - 🔧 **[参数分析指南](docs/src/parameter_analysis.md)** - 多参数数据分析
 
+## 🧭 TODO
+
+- 统一 `single-parameter-analysis` 中的轨道对参数接口，复用数据导出模块的自动映射逻辑
+
 ## 🛠️ 安装
 
 ```julia
