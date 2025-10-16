@@ -750,13 +750,15 @@ function filter_bin_file(
     # Generate output filename if not provided
     if isnothing(output_filename)
         base_name = replace(input_filename, ".bin" => "")
+        # Use the actual matched coordinate from the file, not the input coordinate
+        matched_coord = (coords[coord_idx, 1], coords[coord_idx, 2])
         if coordinate isa Tuple{Int, Int}
             # R-space: use integer format
-            output_filename = "$(base_name)_$(coordinate[1])_$(coordinate[2]).bin"
+            output_filename = "$(base_name)_$(matched_coord[1])_$(matched_coord[2]).bin"
         else
             # K-space: use float format with 3 decimal places
-            coord_str1 = @sprintf("%.3f", coordinate[1])
-            coord_str2 = @sprintf("%.3f", coordinate[2])
+            coord_str1 = @sprintf("%.3f", matched_coord[1])
+            coord_str2 = @sprintf("%.3f", matched_coord[2])
             output_filename = "$(base_name)_$(coord_str1)_$(coord_str2).bin"
         end
     end

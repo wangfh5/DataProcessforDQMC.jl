@@ -162,8 +162,7 @@ end
                                                auto_digits::Bool=true,
                                                tolerance::Float64=1e-6,
                                                verbose::Bool=false,
-                                               filter_options::Union{Dict, NamedTuple}=Dict(),
-                                               pattern::Regex=r"^proj_fft_honeycomb") -> DataFrame
+                                               filter_options::Union{Dict, NamedTuple}=Dict()) -> DataFrame
 
 Analyze AFM correlation ratio across multiple parameter directories.
 
