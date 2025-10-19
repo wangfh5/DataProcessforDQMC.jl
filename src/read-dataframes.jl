@@ -1,3 +1,5 @@
+#!deprecated
+
 export read_format_data
 
 para_metadata_dict = Dict(

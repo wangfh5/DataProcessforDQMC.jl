@@ -330,6 +330,7 @@ end
 """
     statistics_columns(df_tmp::DataFrame)
 average and error of each column of a dataframe with only `bin` and data columns.
+#!deprecated
 """
 function statistics_columns(df_tmp::DataFrame)
     df_tmp = bin_filter(df_tmp)
@@ -350,6 +351,7 @@ end
 """
     statistics_columns_withparas(df_tmp::DataFrame, paras)
 average and error of a dataframe with `bin` column, parameter columns specified by `paras` (symbols) and data columns.
+#!deprecated
 """
 function statistics_columns_withparas(df_tmp; paras=nothing)
     df_tmp = bin_filter(df_tmp)
