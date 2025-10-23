@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Bin Analysis与数据处理指南 · DataProcessforDQMC.jl</title><meta name="title" content="Bin Analysis与数据处理指南 · DataProcessforDQMC.jl"/><meta property="og:title" content="Bin Analysis与数据处理指南 · DataProcessforDQMC.jl"/><meta property="twitter:title" content="Bin Analysis与数据处理指南 · DataProcessforDQMC.jl"/><meta name="description" content="Documentation for DataProcessforDQMC.jl."/><meta property="og:description" content="Documentation for DataProcessforDQMC.jl."/><meta property="twitter:description" content="Documentation for DataProcessforDQMC.jl."/><meta property="og:url" content="https://wangfh5.github.io/DataProcessforDQMC.jl/bin_analysis/"/><meta property="twitter:url" content="https://wangfh5.github.io/DataProcessforDQMC.jl/bin_analysis/"/><link rel="canonical" href="https://wangfh5.github.io/DataProcessforDQMC.jl/bin_analysis/"/><script data-outdated-warner src="../assets/warner.js"></script><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.050/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.8/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL=".."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="../assets/documenter.js"></script><script src="../search_index.js"></script><script src="../siteinfo.js"></script><script src="../../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-mocha.css" data-theme-name="catppuccin-mocha"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-macchiato.css" data-theme-name="catppuccin-macchiato"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-frappe.css" data-theme-name="catppuccin-frappe"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/catppuccin-latte.css" data-theme-name="catppuccin-latte"/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="../assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="../assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href="../">DataProcessforDQMC.jl</a></span></div><button class="docs-search-query input is-rounded is-small is-clickable my-2 mx-auto py-1 px-2" id="documenter-search-query">Search docs (Ctrl + /)</button><ul class="docs-menu"><li><a class="tocitem" href="../">Home</a></li><li><a class="tocitem" href="../precompilation/">预编译指南</a></li><li class="is-active"><a class="tocitem" href>Bin Analysis与数据处理指南</a><ul class="internal"><li><a class="tocitem" href="#功能概览"><span>功能概览</span></a></li><li><a class="tocitem" href="#主要功能"><span>主要功能</span></a></li><li><a class="tocitem" href="#数据格式说明"><span>数据格式说明</span></a></li><li><a class="tocitem" href="#典型工作流"><span>典型工作流</span></a></li></ul></li><li><a class="tocitem" href="../multi_parameter_analysis/">多参数分析指南</a></li><li><a class="tocitem" href="../api/">API Reference</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><a class="docs-sidebar-button docs-navbar-link fa-solid fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Bin Analysis与数据处理指南</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Bin Analysis与数据处理指南</a></li></ul></nav><div class="docs-right"><a class="docs-navbar-link" href="https://github.com/wangfh5/DataProcessforDQMC.jl" title="View the repository on GitHub"><span class="docs-icon fa-brands"></span><span class="docs-label is-hidden-touch">GitHub</span></a><a class="docs-navbar-link" href="https://github.com/wangfh5/DataProcessforDQMC.jl/blob/main/docs/src/bin_analysis.md" title="Edit source on GitHub"><span class="docs-icon fa-solid"></span></a><a class="docs-settings-button docs-navbar-link fa-solid fa-gear" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-article-toggle-button fa-solid fa-chevron-up" id="documenter-article-toggle-button" href="javascript:;" title="Collapse all docstrings"></a></div></header><article class="content" id="documenter-page"><h1 id="bin_analysis_guide"><a class="docs-heading-anchor" href="#bin_analysis_guide">Bin Analysis 与数据处理指南</a><a id="bin_analysis_guide-1"></a><a class="docs-heading-anchor-permalink" href="#bin_analysis_guide" title="Permalink"></a></h1><h2 id="功能概览"><a class="docs-heading-anchor" href="#功能概览">功能概览</a><a id="功能概览-1"></a><a class="docs-heading-anchor-permalink" href="#功能概览" title="Permalink"></a></h2><p>DataProcessforDQMC.jl 提供了完整的bin数据处理和分析工作流。</p><h3 id="数据处理流程"><a class="docs-heading-anchor" href="#数据处理流程">数据处理流程</a><a id="数据处理流程-1"></a><a class="docs-heading-anchor-permalink" href="#数据处理流程" title="Permalink"></a></h3><pre><code class="nohighlight hljs">原始数据 (.bin 文件)
+    ↓
+数据处理 (四大核心操作)
+├─ combine: 多文件加权组合
+├─ scale:   列缩放
+├─ merge:   列合并
+└─ filter:  行提取 (特定坐标)
+    ↓
+数据导出
+├─ CSV:  Excel/Python 友好
+└─ JLD2: Julia 原生高效
+    ↓
+可视化分析</code></pre><h3 id="核心数据处理-(src/data-processing/)"><a class="docs-heading-anchor" href="#核心数据处理-(src/data-processing/)">核心数据处理 (<code>src/data-processing/</code>)</a><a id="核心数据处理-(src/data-processing/)-1"></a><a class="docs-heading-anchor-permalink" href="#核心数据处理-(src/data-processing/)" title="Permalink"></a></h3><p><strong>基本操作</strong> (<code>bin-file-operations-basic.jl</code>):</p><ul><li><code>combine_bin_files</code> - Combine 操作</li><li><code>scale_bin_columns</code> - Scale 操作  </li><li><code>merge_bin_columns</code> - Merge 操作</li><li><code>filter_bin_file</code> - Filter 操作</li></ul><p><strong>导出功能</strong> (<code>bin-file-export.jl</code>):</p><ul><li><code>export_bin_to_dataframe</code> - 转换为 DataFrame</li><li><code>export_bin_to_csv</code> - 导出为 CSV</li><li><code>export_bin_to_jld2</code> - 导出为 JLD2</li><li><code>export_directory_bins</code> - 批量导出</li></ul><p><strong>导出量生成</strong> (<code>derived-bin-generation-*.jl</code>):</p><ul><li><code>afm_k_files_generation</code> - AFM 相关文件生成工作流</li><li><code>cdw_k_files_generation</code> - CDW 相关文件生成工作流</li><li><code>merge_afm_sf</code> - AFM 结构因子 (应用 merge 操作)</li><li><code>combine_ss_components</code> - 自旋分量合并 (应用 combine 操作)</li></ul><h2 id="主要功能"><a class="docs-heading-anchor" href="#主要功能">主要功能</a><a id="主要功能-1"></a><a class="docs-heading-anchor-permalink" href="#主要功能" title="Permalink"></a></h2><h3 id="1.-数据处理的四大核心操作"><a class="docs-heading-anchor" href="#1.-数据处理的四大核心操作">1. 数据处理的四大核心操作</a><a id="1.-数据处理的四大核心操作-1"></a><a class="docs-heading-anchor-permalink" href="#1.-数据处理的四大核心操作" title="Permalink"></a></h3><p>数据处理模块位于 <code>src/data-processing/</code>，提供四种对 <code>.bin</code> 文件的基本操作：</p><h4 id="1.1-Combine-多文件加权组合"><a class="docs-heading-anchor" href="#1.1-Combine-多文件加权组合">1.1 Combine - 多文件加权组合</a><a id="1.1-Combine-多文件加权组合-1"></a><a class="docs-heading-anchor-permalink" href="#1.1-Combine-多文件加权组合" title="Permalink"></a></h4><p>将多个 bin 文件按权重组合成新文件。</p><pre><code class="language-julia hljs">combine_bin_files(&quot;ss_k.bin&quot;, [(&quot;spsm_k.bin&quot;, 1.0), (&quot;szsz_k.bin&quot;, 1.0)])</code></pre><p><strong>应用场景</strong>: 合并自旋分量（如 (S⁺S⁻ + S⁻S⁺)/2 + SᶻSᶻ）</p><h4 id="1.2-Scale-列缩放"><a class="docs-heading-anchor" href="#1.2-Scale-列缩放">1.2 Scale - 列缩放</a><a id="1.2-Scale-列缩放-1"></a><a class="docs-heading-anchor-permalink" href="#1.2-Scale-列缩放" title="Permalink"></a></h4><p>对 bin 文件的指定列进行缩放。</p><pre><code class="language-julia hljs">scale_bin_columns(&quot;scaled.bin&quot;, &quot;input.bin&quot;, [1, 1, 0.5, 0.5, ...])</code></pre><p><strong>应用场景</strong>: 归一化、单位换算</p><h4 id="1.3-Merge-列合并"><a class="docs-heading-anchor" href="#1.3-Merge-列合并">1.3 Merge - 列合并</a><a id="1.3-Merge-列合并-1"></a><a class="docs-heading-anchor-permalink" href="#1.3-Merge-列合并" title="Permalink"></a></h4><p>将多个文件的列合并，或对列进行线性组合。</p><pre><code class="language-julia hljs">merge_afm_sf(&quot;afm_sf_k.bin&quot;, &quot;ss_k.bin&quot;)  # S_AFM = AA + BB - AB - BA</code></pre><p><strong>应用场景</strong>: 生成导出量（如 AFM/CDW 结构因子）</p><h4 id="1.4-Filter-行提取"><a class="docs-heading-anchor" href="#1.4-Filter-行提取">1.4 Filter - 行提取</a><a id="1.4-Filter-行提取-1"></a><a class="docs-heading-anchor-permalink" href="#1.4-Filter-行提取" title="Permalink"></a></h4><p>提取特定坐标的所有 bin 数据。</p><pre><code class="language-julia hljs"># K空间：提取特定动量点的所有bin
+filter_bin_file(&quot;nn_k.bin&quot;, (-0.458, -0.458), dir=&quot;data/&quot;)
+# 输出: nn_k_-0.458_-0.458.bin (包含该k点的所有bin)
+
+# R空间：提取特定格点的所有bin
+filter_bin_file(&quot;nn_r.bin&quot;, (1, 2), dir=&quot;data/&quot;)
+# 输出: nn_r_1_2.bin (包含该位置的所有bin)</code></pre><p><strong>应用场景</strong>: Bin 收敛性分析、特定点的统计涨落分析</p><hr/><h3 id="2.-数据导出功能"><a class="docs-heading-anchor" href="#2.-数据导出功能">2. 数据导出功能</a><a id="2.-数据导出功能-1"></a><a class="docs-heading-anchor-permalink" href="#2.-数据导出功能" title="Permalink"></a></h3><h4 id="导出为DataFrame"><a class="docs-heading-anchor" href="#导出为DataFrame">导出为DataFrame</a><a id="导出为DataFrame-1"></a><a class="docs-heading-anchor-permalink" href="#导出为DataFrame" title="Permalink"></a></h4><pre><code class="language-julia hljs"># 默认导出（4个轨道：AA, AB, BA, BB）
+df = export_bin_to_dataframe(&quot;nn_k.bin&quot;, dir=&quot;data/&quot;)
+# 返回DataFrame，包含列: bin, kx, ky, AA_real, AA_imag, AB_real, AB_imag, ...
+
+# 自定义轨道对配置（仅导出对角项 AA, BB）
+df = export_bin_to_dataframe(&quot;nn_k.bin&quot;, dir=&quot;data/&quot;,
+    orbital_columns=[(3,4), (9,10)],
+    orbital_labels=[&quot;AA&quot;, &quot;BB&quot;])
+# 返回DataFrame，包含列: bin, kx, ky, AA_real, AA_imag, BB_real, BB_imag
+# 注：AA, BB等表示轨道对，如AA表示轨道A到轨道A的关联</code></pre><h4 id="导出为CSV"><a class="docs-heading-anchor" href="#导出为CSV">导出为CSV</a><a id="导出为CSV-1"></a><a class="docs-heading-anchor-permalink" href="#导出为CSV" title="Permalink"></a></h4><pre><code class="language-julia hljs">export_bin_to_csv(&quot;nn_k.bin&quot;, dir=&quot;data/&quot;)
+# 输出: data/exported_csv/nn_k.csv</code></pre><h4 id="导出为JLD2"><a class="docs-heading-anchor" href="#导出为JLD2">导出为JLD2</a><a id="导出为JLD2-1"></a><a class="docs-heading-anchor-permalink" href="#导出为JLD2" title="Permalink"></a></h4><pre><code class="language-julia hljs">export_bin_to_jld2(&quot;nn_k.bin&quot;, dir=&quot;data/&quot;)
+# 输出: data/exported_jld2/nn_k.jld2 (dataset: &quot;nn_k&quot;)
+# 读取: load(&quot;nn_k.jld2&quot;, &quot;nn_k&quot;)
+
+# 如需合并多个文件到一个JLD2
+export_bin_to_jld2(&quot;nn_k.bin&quot;, dir=&quot;data/&quot;, output_file=&quot;all_data.jld2&quot;)  # dataset: nn_k
+export_bin_to_jld2(&quot;nn_r.bin&quot;, dir=&quot;data/&quot;, output_file=&quot;all_data.jld2&quot;)  # dataset: nn_r
+# 输出: data/exported_jld2/all_data.jld2 (datasets: &quot;nn_k&quot;, &quot;nn_r&quot;)
+# 读取: load(&quot;all_data.jld2&quot;, &quot;nn_k&quot;) 或 load(&quot;all_data.jld2&quot;, &quot;nn_r&quot;)</code></pre><h4 id="批量导出"><a class="docs-heading-anchor" href="#批量导出">批量导出</a><a id="批量导出-1"></a><a class="docs-heading-anchor-permalink" href="#批量导出" title="Permalink"></a></h4><pre><code class="language-julia hljs"># 默认导出为CSV和JLD2
+export_directory_bins(&quot;data/&quot;, file_patterns=[&quot;*_k.bin&quot;, &quot;*_r.bin&quot;])
+
+# 指定输出格式
+export_directory_bins(&quot;data/&quot;, output_format=:csv)   # 仅CSV
+export_directory_bins(&quot;data/&quot;, output_format=:jld2)  # 仅JLD2
+export_directory_bins(&quot;data/&quot;, output_format=:both)  # CSV + JLD2（默认）</code></pre><h2 id="数据格式说明"><a class="docs-heading-anchor" href="#数据格式说明">数据格式说明</a><a id="数据格式说明-1"></a><a class="docs-heading-anchor-permalink" href="#数据格式说明" title="Permalink"></a></h2><h3 id="Bin文件结构"><a class="docs-heading-anchor" href="#Bin文件结构">Bin文件结构</a><a id="Bin文件结构-1"></a><a class="docs-heading-anchor-permalink" href="#Bin文件结构" title="Permalink"></a></h3><pre><code class="nohighlight hljs">原始bin文件 (如 nn_k.bin):
+- 5760行 = 576个k点 × 10个bin
+- 按bin分块存储:
+  第1-576行:    bin 0 (所有k点)
+  第577-1152行:  bin 1 (所有k点)
+  ...
+  第5185-5760行: bin 9 (所有k点)</code></pre><h3 id="CSV输出格式"><a class="docs-heading-anchor" href="#CSV输出格式">CSV输出格式</a><a id="CSV输出格式-1"></a><a class="docs-heading-anchor-permalink" href="#CSV输出格式" title="Permalink"></a></h3><p><strong>多轨道数据</strong> (nn_k.csv):</p><pre><code class="language-csv hljs">bin,kx,ky,AA_real,AA_imag,AB_real,AB_imag,BA_real,BA_imag,BB_real,BB_imag
+1,-0.458,-0.458,0.297,-6.62e-10,0.055,0.003,0.055,-0.003,0.289,-8.10e-10
+2,-0.458,-0.458,0.292,-5.75e-10,0.055,-0.002,0.055,0.002,0.299,-3.34e-10
+...</code></pre><p><strong>单列数据</strong> (afm<em>sf</em>k.csv):</p><pre><code class="language-csv hljs">bin,kx,ky,value_real,value_imag
+1,-0.458,-0.458,0.503,-9.38e-10
+2,-0.458,-0.458,0.497,-6.46e-10
+...</code></pre><p><strong>过滤后的数据</strong> (afm<em>sf</em>k<em>0.500</em>0.500.csv):</p><pre><code class="language-csv hljs">bin,kx,ky,value_real,value_imag
+1,0.5,0.5,0.496,-9.28e-10
+2,0.5,0.5,0.497,-6.46e-10
+...
+10,0.5,0.5,0.496,-1.15e-9</code></pre><h2 id="典型工作流"><a class="docs-heading-anchor" href="#典型工作流">典型工作流</a><a id="典型工作流-1"></a><a class="docs-heading-anchor-permalink" href="#典型工作流" title="Permalink"></a></h2><h3 id="工作流1:-生成导出量（derive-应用）"><a class="docs-heading-anchor" href="#工作流1:-生成导出量（derive-应用）">工作流1: 生成导出量（derive 应用）</a><a id="工作流1:-生成导出量（derive-应用）-1"></a><a class="docs-heading-anchor-permalink" href="#工作流1:-生成导出量（derive-应用）" title="Permalink"></a></h3><p>使用数据处理操作生成物理导出量：</p><pre><code class="language-julia hljs">using DataProcessforDQMC
+
+# 应用示例：生成 AFM 相关文件
+# 内部使用 combine + merge 操作
+afm_k_files_generation(&quot;data/&quot;)
+
+# Step 2: 过滤特定k点 (filter 操作)
+filter_bin_file(&quot;afm_sf_k.bin&quot;, (0.5, 0.5), dir=&quot;data/&quot;)
+
+# Step 3: 导出为CSV用于可视化
+export_bin_to_csv(&quot;afm_sf_k_0.500_0.500.bin&quot;, dir=&quot;data/&quot;)
+
+# Step 4: 在Python中绘图
+# import pandas as pd
+# import matplotlib.pyplot as plt
+# df = pd.read_csv(&#39;afm_sf_k_0.500_0.500.csv&#39;)
+# plt.plot(df[&#39;bin&#39;], df[&#39;value_real&#39;])
+# plt.xlabel(&#39;Bin index&#39;)
+# plt.ylabel(&#39;S_AFM(π,π)&#39;)</code></pre><p><strong>涉及操作</strong>: derive 工作流 (combine+merge) → filter → export</p><hr/><h3 id="工作流2:-批量数据导出"><a class="docs-heading-anchor" href="#工作流2:-批量数据导出">工作流2: 批量数据导出</a><a id="工作流2:-批量数据导出-1"></a><a class="docs-heading-anchor-permalink" href="#工作流2:-批量数据导出" title="Permalink"></a></h3><pre><code class="language-julia hljs">using DataProcessforDQMC
+
+# 导出目录下所有关联函数（默认为CSV和JLD2）
+export_directory_bins(
+    &quot;data/&quot;,
+    file_patterns=[&quot;nn_*.bin&quot;, &quot;spsm_*.bin&quot;, &quot;afm_sf_*.bin&quot;],
+    iscorrelation=true
+)
+
+# 在Excel中打开：exported_csv/*.csv
+# 在Python中批量分析：
+# import pandas as pd
+# import glob
+# for f in glob.glob(&#39;exported_csv/*.csv&#39;):
+#     df = pd.read_csv(f)
+#     # 进行分析...
+
+# 在Julia中批量加载（使用JLD2）：
+# using JLD2, DataFrames
+# nn_k_df = load(&quot;exported_jld2/nn_k.jld2&quot;, &quot;nn_k&quot;)
+# nn_r_df = load(&quot;exported_jld2/nn_r.jld2&quot;, &quot;nn_r&quot;)
+# spsm_k_df = load(&quot;exported_jld2/spsm_k.jld2&quot;, &quot;spsm_k&quot;)</code></pre><p><strong>涉及操作</strong>: export</p><hr/><h3 id="工作流3:-多k点关联函数的Bin涨落分析"><a class="docs-heading-anchor" href="#工作流3:-多k点关联函数的Bin涨落分析">工作流3: 多k点关联函数的Bin涨落分析</a><a id="工作流3:-多k点关联函数的Bin涨落分析-1"></a><a class="docs-heading-anchor-permalink" href="#工作流3:-多k点关联函数的Bin涨落分析" title="Permalink"></a></h3><p><strong>目的</strong>: 检查DQMC模拟是否已经热化并达到统计平衡，通过观察不同bin的涨落判断收敛性。</p><p><strong>分析指标</strong>:</p><ul><li>前几个bin: 可能处于热化阶段，数值逐渐稳定</li><li>后续bin: 应呈现统计涨落（上下振荡），围绕平均值波动</li><li>收敛标志: bin数据在误差范围内上下振荡，无明显趋势</li></ul><h4 id="方案1:-先筛选特定k点再导出（推荐用于关注少数k点）"><a class="docs-heading-anchor" href="#方案1:-先筛选特定k点再导出（推荐用于关注少数k点）">方案1: 先筛选特定k点再导出（推荐用于关注少数k点）</a><a id="方案1:-先筛选特定k点再导出（推荐用于关注少数k点）-1"></a><a class="docs-heading-anchor-permalink" href="#方案1:-先筛选特定k点再导出（推荐用于关注少数k点）" title="Permalink"></a></h4><pre><code class="language-julia hljs">using DataProcessforDQMC
+
+# 指定关心的k点（通常是高对称点）
+k_points = [
+    (0.0, 0.0),        # Γ点
+    (0.5, 0.0),        # X点  
+    (0.5, 0.5)         # M点
+]
+
+for k in k_points
+    # 1. 筛选特定k点的所有bin数据
+    filter_bin_file(&quot;nn_k.bin&quot;, k, dir=&quot;data/&quot;)
+    
+    # 2. 导出为CSV用于Excel分析
+    kx_str = @sprintf(&quot;%.3f&quot;, k[1])
+    ky_str = @sprintf(&quot;%.3f&quot;, k[2])
+    filename = &quot;nn_k_$(kx_str)_$(ky_str).bin&quot;
+    export_bin_to_csv(filename, dir=&quot;data/&quot;)
+end
+
+# 3. 在Excel中打开CSV文件，观察每个k点的bin演化
+#    - 横轴: bin index (1, 2, 3, ...)
+#    - 纵轴: 关联函数值
+#    - 检查: 数据是否在后期呈现稳定的上下振荡</code></pre><h4 id="方案2:-直接导出全部数据（适合系统性分析）"><a class="docs-heading-anchor" href="#方案2:-直接导出全部数据（适合系统性分析）">方案2: 直接导出全部数据（适合系统性分析）</a><a id="方案2:-直接导出全部数据（适合系统性分析）-1"></a><a class="docs-heading-anchor-permalink" href="#方案2:-直接导出全部数据（适合系统性分析）" title="Permalink"></a></h4><pre><code class="language-julia hljs">using DataProcessforDQMC
+
+# 直接导出完整的关联函数数据
+export_bin_to_csv(&quot;nn_k.bin&quot;, dir=&quot;data/&quot;)
+
+# 在Excel中：
+# 1. 打开 exported_csv/nn_k.csv
+# 2. 使用筛选功能选择特定k点 (kx, ky)
+# 3. 绘制 bin vs value_real 曲线
+# 4. 观察数据点的演化趋势</code></pre><p><strong>收敛性判断</strong>:</p><ul><li>✅ <strong>良好收敛</strong>: bin 3-10 在平均值附近上下振荡，标准差较小</li><li>⚠️ <strong>未完全热化</strong>: 前几个bin数值持续增大或减小</li><li>❌ <strong>未收敛</strong>: 所有bin呈现明显趋势，无稳定振荡</li></ul><p><strong>涉及操作</strong>: filter → export (或直接 export)</p></article><nav class="docs-footer"><a class="docs-footer-prevpage" href="../precompilation/">« 预编译指南</a><a class="docs-footer-nextpage" href="../multi_parameter_analysis/">多参数分析指南 »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="auto">Automatic (OS)</option><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option><option value="catppuccin-latte">catppuccin-latte</option><option value="catppuccin-frappe">catppuccin-frappe</option><option value="catppuccin-macchiato">catppuccin-macchiato</option><option value="catppuccin-mocha">catppuccin-mocha</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 1.15.0 on <span class="colophon-date" title="Thursday 23 October 2025 03:08">Thursday 23 October 2025</span>. Using Julia version 1.12.1.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
