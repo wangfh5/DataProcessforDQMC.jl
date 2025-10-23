@@ -23,30 +23,29 @@ export scan_parameter_directories,
                               filter_options::Union{Dict, NamedTuple}=Dict(), 
                               return_params::Bool=false) -> Union{Vector{String}, Vector{Tuple{String,String,Vector{Tuple{String,Any,Int}}}}}
 
-扫描指定目录下所有符合筛选条件的子目录。
+Scan and filter subdirectories based on parameters parsed from directory names.
 
-# 参数
-- `base_dir::AbstractString=pwd()`: 基础目录路径，默认为当前工作目录
-- `filter_options::Union{Dict, NamedTuple}=Dict()`: 筛选选项，可以包含以下键：
-  - `"prefix"` 或 `:prefix`: 目录前缀（字符串或字符串数组）
-  - `"b"`, `"U"`, `"L"`, `"dtau"`, `"gw"` 等: 参数范围（可以是单个值、范围或值数组）
-  - `"lprojgw"`: 布尔值，是否使用lprojgw
-- `return_params::Bool=false`: 是否同时返回解析的参数信息
+# Arguments
+- `base_dir::AbstractString=pwd()`: Base directory (default: current dir)
+- `filter_options::Union{Dict, NamedTuple}=Dict()`: Filtering rules by value type:
+  - Single value: equality match. Value may be Number (Int/Float), Bool, or String (e.g. a prefix string).
+  - Array: membership match. Elements may be Number, Bool, or String.
+  - Tuple(min, max): closed interval match, numeric only (do not use for Bool or String).
+  Common keys include `"prefix"`, `"b"`, `"U"`, `"L"`, `"dtau"`, `"gw"`, `"lprojgw"`.
+- `return_params::Bool=false`: Whether to also return parsed parameter info.
 
-# 返回值
-- 当 `return_params=false`: `Vector{String}` - 符合条件的子目录路径列表
-- 当 `return_params=true`: `Vector{Tuple{String,String,Vector{Tuple{String,Any,Int}}}}` - (目录路径, 前缀, 参数列表)的元组列表
+# Returns
+- When `return_params=false`: `Vector{String}` of matching directory paths
+- When `return_params=true`: `Vector{Tuple{String,String,Vector{Tuple{String,Any,Int}}}}`
+  of `(dir_path, prefix, params_vector)`
 
-# 示例
+# Examples
 ```julia
-# 筛选前缀为 "proj_fft_honeycomb_exact" 的目录
-dirs = scan_parameter_directories(filter_options=Dict("prefix" => "proj_fft_honeycomb_exact"))
+# Prefix + array match
+scan_parameter_directories("."; filter_options = Dict("prefix"=>"proj_x", "U"=>[4.0,6.0]))
 
-# 筛选多个条件并返回参数信息
-dirs_with_params = scan_parameter_directories(
-    filter_options=Dict("U" => 4.0, "L" => [6, 9]),
-    return_params=true
-)
+# Bool flag
+scan_parameter_directories("."; filter_options = Dict("lprojgw"=>true))
 ```
 """
 function scan_parameter_directories(base_dir::AbstractString=pwd(); 
