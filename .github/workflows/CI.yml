@@ -23,8 +23,8 @@ jobs:
       fail-fast: false
       matrix:
         version:
-          - '1.0'
-          - '1.9'
+          - '1.10'   # minimum supported per Project.toml
+          - '1'      # latest stable
           - 'nightly'
         os:
           - ubuntu-latest

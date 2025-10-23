@@ -34,34 +34,12 @@ GitHub Pages 自动发布
    ✅ Your site is live at https://wangfh5.github.io/DataProcessforDQMC.jl/
    ```
 
-### 2. 生成部署密钥
+### 2. 无需密钥（推荐做法）
 
-在本地运行（**只需运行一次**）：
-
-```bash
-cd /Users/ssqc/Projects/DataProcessforDQMC.jl
-
-# 安装 DocumenterTools（如果还没有）
-julia -e 'using Pkg; Pkg.add("DocumenterTools")'
-
-# 生成密钥
-julia docs/generate_deploy_key.jl
-```
-
-**重要提示：**
-- 这个脚本会生成一对 SSH 密钥
-- **公钥**会自动添加到 GitHub 仓库的 Deploy Keys
-- **私钥**需要你手动复制到 GitHub Secrets（见下一步）
-
-### 3. 添加私钥到 GitHub Secrets
-
-1. 复制上一步输出的私钥（完整内容，包括 `-----BEGIN OPENSSH PRIVATE KEY-----` 等）
-2. 访问 https://github.com/wangfh5/DataProcessforDQMC.jl/settings/secrets/actions
-3. 点击 **New repository secret**
-4. 填写：
-   - Name: `DOCUMENTER_KEY`
-   - Value: [粘贴私钥]
-5. 点击 **Add secret**
+当前仓库使用 GitHub Actions 提供的 `GITHUB_TOKEN` 完成部署，无需任何额外密钥或 Secrets 配置。
+只需确保：
+- 已启用 GitHub Pages（指向 `gh-pages` 分支，根目录）
+- 保留 `.github/workflows/CI.yml` 中的 `docs` job 即可
 
 ### 4. 验证 CI 配置
 
@@ -118,9 +96,9 @@ python3 -m http.server 8000
 3. 查看详细错误信息
 
 **常见原因：**
-- `DOCUMENTER_KEY` 未设置或设置错误
 - 文档源文件中有语法错误
 - 交叉引用 `@ref` 失效
+- GitHub Pages 未正确指向 `gh-pages` 分支或缓存未刷新（等待 2-5 分钟后再次访问）
 
 ### 问题 2: 部署成功但页面显示 404
 
@@ -141,7 +119,6 @@ python3 -m http.server 8000
 docs/
 ├── make.jl                    # 构建脚本
 ├── Project.toml               # docs 环境依赖
-├── generate_deploy_key.jl     # 密钥生成脚本（一次性使用）
 ├── DEPLOYMENT.md              # 本文档
 └── src/
     ├── index.md               # 首页
