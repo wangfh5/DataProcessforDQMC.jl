@@ -17,6 +17,7 @@ export analyze_correlation_ratio_multi_parameter,
                                            source_file::String="spsm_k.bin",
                                            result_columns::Vector{Symbol}=[:correlation_ratio, :err_correlation_ratio],
                                            result_prefix::String="R",
+                                           force_rebuild::Bool=false,
                                            startbin::Int=2,
                                            endbin::Union{Int,Nothing}=nothing,
                                            dropmaxmin::Int=0,
@@ -36,6 +37,7 @@ Generic multi-parameter correlation ratio analysis function, suitable for analyz
 - `source_file::String`: Source file to generate structure factor if not exists (default: "spsm_k.bin")
 - `result_columns::Vector{Symbol}`: Columns to include in results (default: [:correlation_ratio, :err_correlation_ratio])
 - `result_prefix::String`: Prefix for result column names (default: "R")
+- `force_rebuild::Bool`: Force rebuild structure factor file even if exists (default: false)
 - `startbin::Int`: Starting bin for analysis (default: 2)
 - `endbin::Union{Int,Nothing}`: Ending bin for analysis (default: all bins)
 - `dropmaxmin::Int`: Number of max/min values to drop (default: 0)
@@ -55,6 +57,7 @@ function analyze_correlation_ratio_multi_parameter(correlation_ratio_function::F
                                            source_file::String="spsm_k.bin",
                                            result_columns::Vector{Symbol}=[:correlation_ratio, :err_correlation_ratio],
                                            result_prefix::String="R",
+                                           force_rebuild::Bool=false,
                                            startbin::Int=2,
                                            endbin::Union{Int,Nothing}=nothing,
                                            dropmaxmin::Int=0,
@@ -111,6 +114,7 @@ function analyze_correlation_ratio_multi_parameter(correlation_ratio_function::F
                 shift_point, Q_point, 
                 filename, dir_path;
                 source_file=source_file,
+                force_rebuild=force_rebuild,
                 startbin=startbin, 
                 endbin=endbin, 
                 dropmaxmin=dropmaxmin,
@@ -156,6 +160,7 @@ end
                                                Q_point::Tuple{<:Real,<:Real}=(0.0, 0.0),
                                                filename::String="afm_sf_k.bin",
                                                source_file::String="spsm_k.bin",
+                                               force_rebuild::Bool=false,
                                                startbin::Int=2,
                                                endbin::Union{Int,Nothing}=nothing,
                                                dropmaxmin::Int=0,
@@ -172,6 +177,7 @@ Analyze AFM correlation ratio across multiple parameter directories.
 - `Q_point::Tuple{<:Real,<:Real}`: AFM ordering vector Q (default: (0.0, 0.0))
 - `filename::String`: Structure factor file name (default: "afm_sf_k.bin")
 - `source_file::String`: Source file to generate structure factor if not exists (default: "spsm_k.bin")
+- `force_rebuild::Bool`: Force rebuild structure factor file even if exists (default: false)
 - `startbin::Int`: Starting bin for analysis (default: 2)
 - `endbin::Union{Int,Nothing}`: Ending bin for analysis (default: all bins)
 - `dropmaxmin::Int`: Number of max/min values to drop (default: 0)
@@ -188,6 +194,7 @@ function analyze_AFM_correlation_ratio_multi_parameter(base_dir::AbstractString=
                                                Q_point::Tuple{<:Real,<:Real}=(0.0, 0.0),
                                                filename::String="afm_sf_k.bin",
                                                source_file::String="spsm_k.bin",
+                                               force_rebuild::Bool=false,
                                                startbin::Int=2,
                                                endbin::Union{Int,Nothing}=nothing,
                                                dropmaxmin::Int=0,
@@ -204,6 +211,7 @@ function analyze_AFM_correlation_ratio_multi_parameter(base_dir::AbstractString=
         source_file=source_file,
         result_columns=[:correlation_ratio, :err_correlation_ratio],
         result_prefix="R_AFM",
+        force_rebuild=force_rebuild,
         startbin=startbin,
         endbin=endbin,
         dropmaxmin=dropmaxmin,
@@ -220,6 +228,7 @@ end
                                                Q_point::Tuple{<:Real,<:Real}=(0.0, 0.0),
                                                filename::String="cdwpair_sf_k.bin",
                                                source_file::String="cdwpair_k.bin",
+                                               force_rebuild::Bool=false,
                                                startbin::Int=2,
                                                endbin::Union{Int,Nothing}=nothing,
                                                dropmaxmin::Int=0,
@@ -237,6 +246,7 @@ Analyze CDW correlation ratio across multiple parameter directories.
 - `Q_point::Tuple{<:Real,<:Real}`: CDW ordering vector Q (default: (0.0, 0.0))
 - `filename::String`: Structure factor file name (default: "cdwpair_sf_k.bin")
 - `source_file::String`: Source file to generate structure factor if not exists (default: "cdwpair_k.bin")
+- `force_rebuild::Bool`: Force rebuild structure factor file even if exists (default: false)
 - `startbin::Int`: Starting bin for analysis (default: 2)
 - `endbin::Union{Int,Nothing}`: Ending bin for analysis (default: all bins)
 - `dropmaxmin::Int`: Number of max/min values to drop (default: 0)
@@ -253,6 +263,7 @@ function analyze_CDW_correlation_ratio_multi_parameter(base_dir::AbstractString=
                                                Q_point::Tuple{<:Real,<:Real}=(0.0, 0.0),
                                                filename::String="cdwpair_sf_k.bin",
                                                source_file::String="cdwpair_k.bin",
+                                               force_rebuild::Bool=false,
                                                startbin::Int=2,
                                                endbin::Union{Int,Nothing}=nothing,
                                                dropmaxmin::Int=0,
@@ -269,6 +280,7 @@ function analyze_CDW_correlation_ratio_multi_parameter(base_dir::AbstractString=
         source_file=source_file,
         result_columns=[:correlation_ratio, :err_correlation_ratio],
         result_prefix="R_CDW",
+        force_rebuild=force_rebuild,
         startbin=startbin,
         endbin=endbin,
         dropmaxmin=dropmaxmin,
