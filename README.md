@@ -1,9 +1,9 @@
 # DataProcessforDQMC
 
-<!-- [![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://wangfh5.github.io/DataProcessforDQMC.jl/stable/)
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://wangfh5.github.io/DataProcessforDQMC.jl/stable/)
 [![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://wangfh5.github.io/DataProcessforDQMC.jl/dev/)
 [![Build Status](https://github.com/wangfh5/DataProcessforDQMC.jl/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/wangfh5/DataProcessforDQMC.jl/actions/workflows/CI.yml?query=branch%3Amain)
-[![Coverage](https://codecov.io/gh/wangfh5/DataProcessforDQMC.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/wangfh5/DataProcessforDQMC.jl) -->
+[![Coverage](https://codecov.io/gh/wangfh5/DataProcessforDQMC.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/wangfh5/DataProcessforDQMC.jl)
 
 专门用于处理**行列式量子蒙特卡洛（DQMC）**模拟数据的Julia包，提供方便的数据分析工具链。
 仅供个人使用, 对数据规范有特定要求. 
@@ -48,9 +48,11 @@ results = analyze_AFM_structure_factor_multi_parameter(
 
 ## 📚 文档
 
+- 在线文档：**[开发版](https://wangfh5.github.io/DataProcessforDQMC.jl/dev/)** | **[稳定版](https://wangfh5.github.io/DataProcessforDQMC.jl/stable/)**
+
 - ⚡ **[预编译指南](docs/src/precompilation.md)** - 系统镜像构建和使用
 - 📖 **[原始数据操作指南](docs/src/bin_analysis.md)** - 对`.bin`文件进行的常用操作
-- 🔧 **[参数分析指南](docs/src/parameter_analysis.md)** - 多参数数据分析
+- 🔧 **[参数分析指南](docs/src/multi_parameter_analysis.md)** - 多参数数据分析
 
 ## 🧭 TODO
 
