@@ -57,8 +57,8 @@ begin
     
     # Generate AFM structure factor directly from spsm_k.bin (XY component only)
     afm_sf_path = merge_afm_sf(
-        "afm_sf_k.bin",
         "spsm_k.bin",  # Use spsm_k.bin as source instead of ss_k.bin
+        "afm_sf_k.bin",
         data_dir,
         data_dir,
         verbose=true

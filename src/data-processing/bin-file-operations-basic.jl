@@ -178,11 +178,11 @@ end
 
 """
     scale_bin_columns(
-        output_filename::String,
         input_filename::String,
+        output_filename::String,
         column_factors::Union{Vector{<:Real}, Dict{Int, <:Real}},
-        output_dir::String=pwd(),
-        input_dir::String=pwd();
+        input_dir::String=pwd(),
+        output_dir::String=pwd();
         preserve_columns::Union{Vector{Int}, UnitRange{Int}, Nothing}=nothing,
         default_factor::Real=1.0,
         verbose::Bool=false
@@ -191,11 +191,11 @@ end
 对二进制数据文件的指定列应用标量因子。
 
 # 参数
-- `output_filename::String`: 输出文件名
 - `input_filename::String`: 输入文件名
+- `output_filename::String`: 输出文件名
 - `column_factors::Union{Vector{<:Real}, Dict{Int, <:Real}}`: 列因子，可以是向量（按顺序应用）或字典（指定列索引）
-- `output_dir::String=pwd()`: 输出文件目录
 - `input_dir::String=pwd()`: 输入文件目录
+- `output_dir::String=pwd()`: 输出文件目录
 - `preserve_columns::Union{Vector{Int}, UnitRange{Int}, Nothing}=nothing`: 保持不变的列索引（这些列将不应用因子）
 - `default_factor::Real=1.0`: 未指定列的默认因子
 - `verbose::Bool=false`: 是否输出详细信息
@@ -207,8 +207,8 @@ end
 ```julia
 # 对第3-10列应用不同的标量因子
 scale_bin_columns(
-    "scaled_output.bin",  # 输出文件名
     "input.bin",          # 输入文件名
+    "scaled_output.bin",  # 输出文件名
     [1, 1, 0.5, 0.5, -1, -1, 0.25, 0.25],  # 列因子
     preserve_columns=1:2,  # 前两列保持不变
     verbose=true
@@ -216,8 +216,8 @@ scale_bin_columns(
 
 # 使用字典指定特定列的因子
 scale_bin_columns(
-    "scaled_output.bin",
     "input.bin",
+    "scaled_output.bin",
     Dict(3 => 0.5, 4 => 0.5, 5 => -1, 6 => -1),  # 只修改指定列
     default_factor=1.0,  # 其他列保持原值
     verbose=true
@@ -225,11 +225,11 @@ scale_bin_columns(
 ```
 """
 function scale_bin_columns(
-    output_filename::String,
     input_filename::String,
+    output_filename::String,
     column_factors::Union{Vector{<:Real}, Dict{Int, <:Real}},
-    output_dir::String=pwd(),
-    input_dir::String=pwd();
+    input_dir::String=pwd(),
+    output_dir::String=pwd();
     preserve_columns::Union{Vector{Int}, UnitRange{Int}, Nothing}=nothing,
     default_factor::Real=1.0,
     verbose::Bool=false
@@ -321,13 +321,13 @@ end
 
 """
     function merge_bin_columns(
-        output_filename::String,
         input_filename::String,
+        output_filename::String,
         real_columns::Vector{Int},
         imag_columns::Vector{Int},
         weights::Vector{Float64}=ones(length(real_columns)),
-        output_dir::String=pwd(),
-        input_dir::String=pwd();
+        input_dir::String=pwd(),
+        output_dir::String=pwd();
         preserve_columns::UnitRange{Int}=1:2,
         verbose::Bool=false
     )
@@ -335,13 +335,13 @@ end
 将一个多列数据中的指定列合并为单列，生成新的数据文件。
 
 参数：
-- `output_filename`: 输出文件名
 - `input_filename`: 输入文件名
+- `output_filename`: 输出文件名
 - `real_columns`: 要合并的实部列索引
 - `imag_columns`: 要合并的虚部列索引
 - `weights`: 每对列的权重，默认全为1.0
-- `output_dir`: 输出目录，默认为当前目录
 - `input_dir`: 输入目录，默认为当前目录
+- `output_dir`: 输出目录，默认为当前目录
 - `preserve_columns`: 要保留的列范围，默认为1:2（通常是k点坐标）
 - `verbose`: 是否输出详细信息，默认为false
 
@@ -352,8 +352,8 @@ end
 ```julia
 # 合并AA和BB轨道到单列文件
 merged_file = merge_bin_columns(
-    "merged.bin",       # 输出文件名
     "spsm_k.bin",      # 输入文件名
+    "merged.bin",       # 输出文件名
     [3, 9],           # 实部列（AA和BB轨道的实部）
     [4, 10],          # 虚部列（AA和BB轨道的虚部）
     [1.0, 1.0]        # 权重
@@ -361,13 +361,13 @@ merged_file = merge_bin_columns(
 ```
 """
 function merge_bin_columns(
-    output_filename::String,
     input_filename::String,
+    output_filename::String,
     real_columns::Vector{Int},
     imag_columns::Vector{Int},
     weights::Vector{Float64}=ones(length(real_columns)),
-    output_dir::String=pwd(),
-    input_dir::String=pwd();
+    input_dir::String=pwd(),
+    output_dir::String=pwd();
     preserve_columns::UnitRange{Int}=1:2,
     verbose::Bool=false
 )
@@ -462,10 +462,10 @@ end
 
 """    
     merge_staggered_components(
-        output_filename::String="afm_sf_k.bin",
         input_filename::String="ss_k.bin",
-        output_dir::String=pwd(),
-        input_dir::String=pwd();
+        output_filename::String="afm_sf_k.bin",
+        input_dir::String=pwd(),
+        output_dir::String=pwd();
         real_columns::Vector{Int}=[3, 9, 5, 7],  # [AA, BB, AB, BA] 实部列
         imag_columns::Vector{Int}=[4, 10, 6, 8], # [AA, BB, AB, BA] 虚部列
         preserve_columns::UnitRange{Int}=1:2,
@@ -479,10 +479,10 @@ end
 默认的文件名设置（ss_k.bin -> afm_sf_k.bin）反映了这一应用场景。
 
 # 参数
-- `output_filename::String="afm_sf_k.bin"`: 输出文件名
 - `input_filename::String="ss_k.bin"`: 输入文件名
-- `output_dir::String=pwd()`: 输出目录，默认为当前目录
+- `output_filename::String="afm_sf_k.bin"`: 输出文件名
 - `input_dir::String=pwd()`: 输入目录，默认为当前目录
+- `output_dir::String=pwd()`: 输出目录，默认为当前目录
 - `real_columns::Vector{Int}=[3, 9, 5, 7]`: 实部列索引数组，顺序为[A, B, C, D]
 - `imag_columns::Vector{Int}=[4, 10, 6, 8]`: 虚部列索引数组，顺序为[A, B, C, D]
 - `preserve_columns::UnitRange{Int}=1:2`: 要保留的列范围，默认为1:2（通常是k点坐标）
@@ -495,24 +495,24 @@ end
 ```julia
 # 计算反铁磁结构因子
 afm_sf_file = merge_staggered_components(
-    "afm_sf_k.bin",
-    "ss_k.bin"
+    "ss_k.bin",
+    "afm_sf_k.bin"
 )
 
 # 自定义列索引
 result = merge_staggered_components(
-    "custom_output.bin",
     "custom_input.bin",
+    "custom_output.bin",
     real_columns=[3, 5, 7, 9],
     imag_columns=[4, 6, 8, 10]
 )
 ```
 """
 function merge_staggered_components(
-    output_filename::String="afm_sf_k.bin",
     input_filename::String="ss_k.bin",
-    output_dir::String=pwd(),
-    input_dir::String=pwd();
+    output_filename::String="afm_sf_k.bin",
+    input_dir::String=pwd(),
+    output_dir::String=pwd();
     real_columns::Vector{Int}=[3, 9, 5, 7],  # [A, B, C, D] 实部列
     imag_columns::Vector{Int}=[4, 10, 6, 8], # [A, B, C, D] 虚部列
     preserve_columns::UnitRange{Int}=1:2,
@@ -535,13 +535,13 @@ function merge_staggered_components(
     
     # 调用通用的merge_bin_columns函数
     result = merge_bin_columns(
-        output_filename,
         input_filename,
+        output_filename,
         real_columns,
         imag_columns,
         weights,
-        output_dir,
-        input_dir;
+        input_dir,
+        output_dir;
         preserve_columns=preserve_columns,
         verbose=verbose
     )
@@ -552,10 +552,10 @@ end
 
 """    
     merge_uniform_components(
-        output_filename::String="cdwpair_sf_k.bin",
         input_filename::String="cdwpair_k.bin",
-        output_dir::String=pwd(),
-        input_dir::String=pwd();
+        output_filename::String="cdwpair_sf_k.bin",
+        input_dir::String=pwd(),
+        output_dir::String=pwd();
         real_columns::Vector{Int}=[3, 9, 5, 7],  # [A, B, C, D] 实部列
         imag_columns::Vector{Int}=[4, 10, 6, 8], # [A, B, C, D] 虚部列
         preserve_columns::UnitRange{Int}=1:2,
@@ -569,10 +569,10 @@ end
 默认的文件名设置（cdwpair_k.bin -> cdwpair_sf_k.bin）反映了这一应用场景。
 
 # 参数
-- `output_filename::String="cdwpair_sf_k.bin"`: 输出文件名
 - `input_filename::String="cdwpair_k.bin"`: 输入文件名
-- `output_dir::String=pwd()`: 输出目录，默认为当前目录
+- `output_filename::String="cdwpair_sf_k.bin"`: 输出文件名
 - `input_dir::String=pwd()`: 输入目录，默认为当前目录
+- `output_dir::String=pwd()`: 输出目录，默认为当前目录
 - `real_columns::Vector{Int}=[3, 9, 5, 7]`: 实部列索引数组，顺序为[A, B, C, D]
 - `imag_columns::Vector{Int}=[4, 10, 6, 8]`: 虚部列索引数组，顺序为[A, B, C, D]
 - `preserve_columns::UnitRange{Int}=1:2`: 要保留的列范围，默认为1:2（通常是k点坐标）
@@ -585,24 +585,24 @@ end
 ```julia
 # 计算电荷结构因子
 cdwpair_sf_file = merge_uniform_components(
-    "cdwpair_sf_k.bin",
-    "cdwpair_k.bin"
+    "cdwpair_k.bin",
+    "cdwpair_sf_k.bin"
 )
 
 # 自定义列索引
 result = merge_uniform_components(
-    "custom_output.bin",
     "custom_input.bin",
+    "custom_output.bin",
     real_columns=[3, 5, 7, 9],
     imag_columns=[4, 6, 8, 10]
 )
 ```
 """
 function merge_uniform_components(
-    output_filename::String="cdwpair_sf_k.bin",
     input_filename::String="cdwpair_k.bin",
-    output_dir::String=pwd(),
-    input_dir::String=pwd();
+    output_filename::String="cdwpair_sf_k.bin",
+    input_dir::String=pwd(),
+    output_dir::String=pwd();
     real_columns::Vector{Int}=[3, 9, 5, 7],  # [A, B, C, D] 实部列
     imag_columns::Vector{Int}=[4, 10, 6, 8], # [A, B, C, D] 虚部列
     preserve_columns::UnitRange{Int}=1:2,
@@ -625,13 +625,13 @@ function merge_uniform_components(
     
     # 调用通用的merge_bin_columns函数
     result = merge_bin_columns(
-        output_filename,
         input_filename,
+        output_filename,
         real_columns,
         imag_columns,
         weights,
-        output_dir,
-        input_dir;
+        input_dir,
+        output_dir;
         preserve_columns=preserve_columns,
         verbose=verbose
     )

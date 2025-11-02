@@ -56,7 +56,7 @@ function cdwpair_k_files_generation(dir::AbstractString=pwd(); cdwpair_source::S
         
         # 1. 生成cdw_k.bin
         verbose && println("正在生成 cdw_k.bin...")
-        cdw_path = create_cdw_from_nn("cdw_k.bin", "nn_k.bin", dir, dir; verbose=false)
+        cdw_path = create_cdw_from_nn("nn_k.bin", "cdw_k.bin", dir, dir; verbose=false)
         if cdw_path != ""
             result["cdw_k.bin"] = cdw_path
             verbose && println("✓ 成功生成 cdw_k.bin")
@@ -66,7 +66,7 @@ function cdwpair_k_files_generation(dir::AbstractString=pwd(); cdwpair_source::S
         
         # 2. 生成cdwpair_k.bin
         verbose && println("\n正在生成 cdwpair_k.bin...")
-        cdwpair_path = combine_cdwpair_components("cdwpair_k.bin", "cdw_k.bin", "pair_onsite_k.bin", dir, dir; verbose=false)
+        cdwpair_path = combine_cdwpair_components("cdw_k.bin", "pair_onsite_k.bin", "cdwpair_k.bin", dir, dir; verbose=false)
         if cdwpair_path != ""
             result["cdwpair_k.bin"] = cdwpair_path
             verbose && println("✓ 成功生成 cdwpair_k.bin")
@@ -76,7 +76,7 @@ function cdwpair_k_files_generation(dir::AbstractString=pwd(); cdwpair_source::S
         
         # 3. 生成cdwpair_sf_k.bin
         verbose && println("\n正在生成 cdwpair_sf_k.bin...")
-        cdwpair_sf_path = merge_cdw_sf("cdwpair_sf_k.bin", cdwpair_source, dir, dir; verbose=false)
+        cdwpair_sf_path = merge_cdw_sf(cdwpair_source, "cdwpair_sf_k.bin", dir, dir; verbose=false)
         if isfile(joinpath(dir, "cdwpair_sf_k.bin"))
             result["cdwpair_sf_k.bin"] = cdwpair_sf_path
             verbose && println("✓ 成功生成 cdwpair_sf_k.bin")
@@ -97,10 +97,10 @@ end
 
 """
     create_cdw_from_nn(
-        output_filename::String="cdw_k.bin",
         input_filename::String="nn_k.bin",
-        output_dir::String=pwd(),
-        input_dir::String=pwd();
+        output_filename::String="cdw_k.bin",
+        input_dir::String=pwd(),
+        output_dir::String=pwd();
         preserve_columns::Union{Vector{Int}, UnitRange{Int}}=1:2,
         verbose::Bool=true
     )
@@ -109,10 +109,10 @@ end
 应用η_α η_β因子到对应的轨道，其中η_α是+1（α=A轨道）或-1（α=B轨道）。
 
 # 参数
-- `output_filename::String="cdw_k.bin"`: 输出文件名
 - `input_filename::String="nn_k.bin"`: 输入密度-密度关联文件名
-- `output_dir::String=pwd()`: 输出文件目录
+- `output_filename::String="cdw_k.bin"`: 输出文件名
 - `input_dir::String=pwd()`: 输入文件目录
+- `output_dir::String=pwd()`: 输出文件目录
 - `preserve_columns::Union{Vector{Int}, UnitRange{Int}}=1:2`: 保持不变的列索引（默认前两列，通常是k点坐标）
 - `verbose::Bool=true`: 是否输出详细信息
 
@@ -122,14 +122,14 @@ end
 # 示例
 ```julia
 # 创建CDW关联文件
-cdw_file = create_cdw_from_nn("cdw_k.bin", "nn_k.bin")
+cdw_file = create_cdw_from_nn("nn_k.bin", "cdw_k.bin")
 ```
 """
 function create_cdw_from_nn(
-    output_filename::String="cdw_k.bin",
     input_filename::String="nn_k.bin",
-    output_dir::String=pwd(),
-    input_dir::String=pwd();
+    output_filename::String="cdw_k.bin",
+    input_dir::String=pwd(),
+    output_dir::String=pwd();
     preserve_columns::Union{Vector{Int}, UnitRange{Int}}=1:2,
     verbose::Bool=true
 )
@@ -182,11 +182,11 @@ function create_cdw_from_nn(
     
     # 调用scale_bin_columns函数应用因子
     return scale_bin_columns(
-        output_filename,
         input_filename,
+        output_filename,
         column_factors,
-        output_dir,
-        input_dir;
+        input_dir,
+        output_dir;
         preserve_columns=preserve_columns,
         default_factor=1.0,
         verbose=false
@@ -195,11 +195,11 @@ end
 
 """
     combine_cdwpair_components(
-        output_filename::String="cdwpair_k.bin",
         cdw_filename::String="cdw_k.bin",
         pair_filename::String="pair_onsite_k.bin",
-        output_dir::String=pwd(),
+        output_filename::String="cdwpair_k.bin",
         input_dir::String=pwd(),
+        output_dir::String=pwd(),
         cdw_weight::Real=1.0,
         pair_weight::Real=2.0;
         preserve_columns::Union{Vector{Int}, UnitRange{Int}}=1:2,
@@ -210,11 +210,11 @@ end
 如果CDW关联文件不存在，会自动从密度-密度关联文件创建。
 
 # 参数
-- `output_filename::String="cdwpair_k.bin"`: 输出文件名
 - `cdw_filename::String="cdw_k.bin"`: CDW关联文件名
 - `pair_filename::String="pair_onsite_k.bin"`: 配对关联文件名
-- `output_dir::String=pwd()`: 输出文件目录
+- `output_filename::String="cdwpair_k.bin"`: 输出文件名
 - `input_dir::String=pwd()`: 输入文件目录
+- `output_dir::String=pwd()`: 输出文件目录
 - `cdw_weight::Real=1.0`: CDW关联的权重（默认为1.0）
 - `pair_weight::Real=2.0`: 配对关联的权重（默认为2.0）
 - `preserve_columns::Union{Vector{Int}, UnitRange{Int}}=1:2`: 保持不变的列索引（默认前两列，通常是k点坐标）
@@ -226,15 +226,15 @@ end
 # 示例
 ```julia
 # 合并CDW和配对关联
-combined_file = combine_cdwpair_components("cdwpair_k.bin")
+combined_file = combine_cdwpair_components("cdw_k.bin", "pair_onsite_k.bin", "cdwpair_k.bin")
 ```
 """
 function combine_cdwpair_components(
-    output_filename::String="cdwpair_k.bin",
     cdw_filename::String="cdw_k.bin",
     pair_filename::String="pair_onsite_k.bin",
-    output_dir::String=pwd(),
+    output_filename::String="cdwpair_k.bin",
     input_dir::String=pwd(),
+    output_dir::String=pwd(),
     cdw_weight::Real=1.0,
     pair_weight::Real=2.0;
     preserve_columns::Union{Vector{Int}, UnitRange{Int}}=1:2,
@@ -253,20 +253,20 @@ end
 
 """
     merge_cdw_sf(
-        output_file::AbstractString="cdwpair_sf_k.bin",
         input_file::AbstractString="cdwpair_k.bin",
-        output_dir::AbstractString=pwd(),
-        input_dir::AbstractString=pwd();
+        output_file::AbstractString="cdwpair_sf_k.bin",
+        input_dir::AbstractString=pwd(),
+        output_dir::AbstractString=pwd();
         verbose::Bool=true
     )
 
 计算电荷密度波结构因子并保存到文件。
 
 # 参数
-- `output_file::AbstractString="cdwpair_sf_k.bin"`: 输出文件名
 - `input_file::AbstractString="cdwpair_k.bin"`: 输入文件名
-- `output_dir::AbstractString=pwd()`: 输出文件目录
+- `output_file::AbstractString="cdwpair_sf_k.bin"`: 输出文件名
 - `input_dir::AbstractString=pwd()`: 输入文件目录
+- `output_dir::AbstractString=pwd()`: 输出文件目录
 - `verbose::Bool=true`: 是否显示详细信息
 
 # 返回值
@@ -277,15 +277,15 @@ end
 # 使用默认设置计算电荷密度波结构因子
 output_path = merge_cdw_sf()
 
-# 指定输出和输入文件名及目录
-output_path = merge_cdw_sf("my_output.bin", "my_input.bin", "/output/dir", "/input/dir", verbose=true)
+# 指定输入和输出文件名及目录
+output_path = merge_cdw_sf("my_input.bin", "my_output.bin", "/input/dir", "/output/dir", verbose=true)
 ```
 """
 function merge_cdw_sf(
-    output_file::AbstractString="cdwpair_sf_k.bin",
     input_file::AbstractString="cdwpair_k.bin",
-    output_dir::AbstractString=pwd(),
-    input_dir::AbstractString=pwd();
+    output_file::AbstractString="cdwpair_sf_k.bin",
+    input_dir::AbstractString=pwd(),
+    output_dir::AbstractString=pwd();
     verbose::Bool=true
 )
     verbose && println("从 $input_file 生成电荷密度波结构因子 $output_file...")
@@ -293,10 +293,10 @@ function merge_cdw_sf(
     try
         # 调用merge_uniform_components函数，使用默认的列索引配置
         result = merge_uniform_components(
-            output_file,
             input_file,
-            output_dir,
-            input_dir;
+            output_file,
+            input_dir,
+            output_dir;
             real_columns=[3, 9, 5, 7],  # [AA, BB, AB, BA] 实部列
             imag_columns=[4, 10, 6, 8], # [AA, BB, AB, BA] 虚部列
             verbose=verbose

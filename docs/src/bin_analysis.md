@@ -62,7 +62,7 @@ combine_bin_files("ss_k.bin", [("spsm_k.bin", 1.0), ("szsz_k.bin", 1.0)])
 对 bin 文件的指定列进行缩放。
 
 ```julia
-scale_bin_columns("scaled.bin", "input.bin", [1, 1, 0.5, 0.5, ...])
+scale_bin_columns("input.bin", "scaled.bin", [1, 1, 0.5, 0.5, ...])
 ```
 
 **应用场景**: 归一化、单位换算
@@ -71,7 +71,7 @@ scale_bin_columns("scaled.bin", "input.bin", [1, 1, 0.5, 0.5, ...])
 将多个文件的列合并，或对列进行线性组合。
 
 ```julia
-merge_afm_sf("afm_sf_k.bin", "ss_k.bin")  # S_AFM = AA + BB - AB - BA
+merge_afm_sf("ss_k.bin", "afm_sf_k.bin")  # S_AFM = AA + BB - AB - BA
 ```
 
 **应用场景**: 生成导出量（如 AFM/CDW 结构因子）

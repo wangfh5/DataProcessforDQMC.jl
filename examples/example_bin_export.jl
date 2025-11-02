@@ -44,7 +44,7 @@ begin
     println("Step 1: Generate AFM structure factor...")
     
     # Generate AFM structure factor
-    afm_sf_path = merge_afm_sf("afm_sf_k.bin", "spsm_k.bin", data_dir, data_dir, verbose=false)
+    afm_sf_path = merge_afm_sf("spsm_k.bin", "afm_sf_k.bin", data_dir, data_dir, verbose=false)
     
     println("Step 2: Export to CSV...")
     csv_path = export_bin_to_csv("afm_sf_k.bin", data_dir)

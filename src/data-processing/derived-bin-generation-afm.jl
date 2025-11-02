@@ -54,7 +54,7 @@ function afm_k_files_generation(dir::AbstractString=pwd(); afm_source::String="s
         
         # 1. 生成ss_k.bin
         verbose && println("正在生成 ss_k.bin...")
-        ss_path = combine_ss_components("ss_k.bin", "spsm_k.bin", "szsz_k.bin", dir, dir; verbose=false)
+        ss_path = combine_ss_components("spsm_k.bin", "szsz_k.bin", "ss_k.bin", dir, dir; verbose=false)
         if ss_path != ""
             result["ss_k.bin"] = ss_path
             verbose && println("✓ 成功生成 ss_k.bin")
@@ -64,7 +64,7 @@ function afm_k_files_generation(dir::AbstractString=pwd(); afm_source::String="s
         
         # 2. 生成afm_sf_k.bin (利用指定文件afm_source)
         verbose && println("\n正在生成 afm_sf_k.bin...")
-        afm_sf_path = merge_afm_sf("afm_sf_k.bin", afm_source, dir, dir; verbose=false)
+        afm_sf_path = merge_afm_sf(afm_source, "afm_sf_k.bin", dir, dir; verbose=false)
         if isfile(afm_sf_path)
             result["afm_sf_k.bin"] = afm_sf_path
             verbose && println("✓ 成功生成 afm_sf_k.bin")
@@ -85,11 +85,11 @@ end
 
 """
     combine_ss_components(
-        output_filename::String="ss_k.bin",
         spsm_filename::String="spsm_k.bin",
         szsz_filename::String="szsz_k.bin",
-        output_dir::String=pwd(),
+        output_filename::String="ss_k.bin",
         input_dir::String=pwd(),
+        output_dir::String=pwd(),
         xy_weight::Real=1.0,
         zz_weight::Real=1.0;
         preserve_columns::Union{Vector{Int}, UnitRange{Int}}=1:2,
@@ -99,11 +99,11 @@ end
 合并 XY 和 Z 分量的自旋相关函数数据文件。
 
 # 参数
-- `output_filename::String="ss_k.bin"`: 输出文件名
 - `spsm_filename::String="spsm_k.bin"`: XY分量文件名
 - `szsz_filename::String="szsz_k.bin"`: Z分量文件名
-- `output_dir::String=pwd()`: 输出文件目录
+- `output_filename::String="ss_k.bin"`: 输出文件名
 - `input_dir::String=pwd()`: 输入文件目录
+- `output_dir::String=pwd()`: 输出文件目录
 - `xy_weight::Real=1.0`: XY分量的权重
 - `zz_weight::Real=1.0`: Z分量的权重
 - `preserve_columns::Union{Vector{Int}, UnitRange{Int}}=1:2`: 保持不变的列索引
@@ -116,18 +116,18 @@ end
 ```julia
 # 合并 k 空间的 XY 和 Z 分量
 combined_file = combine_ss_components(
-    "ss_k.bin",
     "spsm_k.bin",
-    "szsz_k.bin"
+    "szsz_k.bin",
+    "ss_k.bin"
 )
 ```
 """
 function combine_ss_components(
-    output_filename::String="ss_k.bin",
     spsm_filename::String="spsm_k.bin",
     szsz_filename::String="szsz_k.bin",
-    output_dir::String=pwd(),
+    output_filename::String="ss_k.bin",
     input_dir::String=pwd(),
+    output_dir::String=pwd(),
     xy_weight::Real=1.0,
     zz_weight::Real=1.0;
     preserve_columns::Union{Vector{Int}, UnitRange{Int}}=1:2,
@@ -146,20 +146,20 @@ end
 
 """
     merge_afm_sf(
-        output_file::AbstractString="afm_sf_k.bin",
         input_file::AbstractString="ss_k.bin",
-        output_dir::AbstractString=pwd(),
-        input_dir::AbstractString=pwd();
+        output_file::AbstractString="afm_sf_k.bin",
+        input_dir::AbstractString=pwd(),
+        output_dir::AbstractString=pwd();
         verbose::Bool=true
     )
 
 计算反铁磁结构因子并保存到文件。
 
 # 参数
-- `output_file::AbstractString="afm_sf_k.bin"`: 输出文件名
 - `input_file::AbstractString="ss_k.bin"`: 输入文件名
-- `output_dir::AbstractString=pwd()`: 输出文件目录
+- `output_file::AbstractString="afm_sf_k.bin"`: 输出文件名
 - `input_dir::AbstractString=pwd()`: 输入文件目录
+- `output_dir::AbstractString=pwd()`: 输出文件目录
 - `verbose::Bool=true`: 是否显示详细信息
 
 # 返回值
@@ -170,15 +170,15 @@ end
 # 使用默认设置计算反铁磁结构因子
 output_path = merge_afm_sf()
 
-# 指定输出和输入文件名及目录
-output_path = merge_afm_sf("my_afm_sf_k.bin", "my_ss_k.bin", "/output/dir", "/input/dir", verbose=true)
+# 指定输入和输出文件名及目录
+output_path = merge_afm_sf("my_ss_k.bin", "my_afm_sf_k.bin", "/input/dir", "/output/dir", verbose=true)
 ```
 """
 function merge_afm_sf(
-    output_file::AbstractString="afm_sf_k.bin",
     input_file::AbstractString="ss_k.bin",
-    output_dir::AbstractString=pwd(),
-    input_dir::AbstractString=pwd();
+    output_file::AbstractString="afm_sf_k.bin",
+    input_dir::AbstractString=pwd(),
+    output_dir::AbstractString=pwd();
     verbose::Bool=true
 )
     verbose && println("从 $input_file 生成反铁磁结构因子 $output_file...")
@@ -186,10 +186,10 @@ function merge_afm_sf(
     try
         # 调用merge_staggered_components函数，使用默认的列索引配置
         result = merge_staggered_components(
-            output_file,
             input_file,
-            output_dir,
-            input_dir;
+            output_file,
+            input_dir,
+            output_dir;
             real_columns=[3, 9, 5, 7],  # [AA, BB, AB, BA] 实部列
             imag_columns=[4, 10, 6, 8], # [AA, BB, AB, BA] 虚部列
             verbose=false
