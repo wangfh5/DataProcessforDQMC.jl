@@ -211,7 +211,7 @@ function CorrelationAnalysis(filename::String="spsm_r.bin", filedir::String=pwd(
     
     filepath = joinpath(filedir, filename)
     if !isfile(filepath)
-        error("File not found: $filepath")
+        @error "File not found: $filepath"
     end
     
     # 读取数据
@@ -321,7 +321,7 @@ function MultiOrbitalCorrelationAnalysis(filename::String="nn_r.bin", filedir::S
                                       verbose::Bool=true)
     # Validate inputs
     if length(orbital_columns) != length(orbital_labels)
-        error("Number of orbital columns ($(length(orbital_columns))) must match number of orbital labels ($(length(orbital_labels)))")
+        @error "Number of orbital columns ($(length(orbital_columns))) must match number of orbital labels ($(length(orbital_labels)))"
     end
     
     # File reading and validation
@@ -331,7 +331,7 @@ function MultiOrbitalCorrelationAnalysis(filename::String="nn_r.bin", filedir::S
     
     filepath = joinpath(filedir, filename)
     if !isfile(filepath)
-        error("File not found: $filepath")
+        @error "File not found: $filepath"
     end
     
     # Read data

@@ -12,7 +12,7 @@
 - Run tests (with coverage): `julia --project=. -e 'using Pkg; Pkg.test(coverage=true)'`
 - Run example: `julia --project=. examples/test_multi_param.jl`
 - Build docs locally: `julia --project=docs -e 'using Pkg; Pkg.instantiate(); include("docs/make.jl")'`
-- Optional sysimage (faster startup): `julia --project=. -e 'using DataProcessforDQMC; DataProcessforDQMC.compile()'` (see `docs/src/precompilation.md`).
+- Optional sysimage (faster startup): See detailed instructions in `docs/src/precompilation.md` (requires global environment setup with PackageCompiler).
 
 ## Coding Style & Naming Conventions
 - Julia style, 4‑space indentation; keep lines readable (<100 chars); no trailing whitespace.

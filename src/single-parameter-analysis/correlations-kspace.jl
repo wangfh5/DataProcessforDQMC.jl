@@ -175,7 +175,7 @@ function KSpaceCorrelationAnalysis(filename::String="nn_k.bin", filedir::String=
     
     filepath = joinpath(filedir, filename)
     if !isfile(filepath)
-        error("File not found: $filepath")
+        @error "File not found: $filepath"
     end
     
     # 读取数据
@@ -279,7 +279,7 @@ function MultiOrbitalKSpaceCorrelationAnalysis(filename::String="nn_k.bin", file
                                              verbose::Bool=true)
     # Validate inputs
     if length(orbital_columns) != length(orbital_labels)
-        error("Number of orbital columns ($(length(orbital_columns))) must match number of orbital labels ($(length(orbital_labels)))")
+        @error "Number of orbital columns ($(length(orbital_columns))) must match number of orbital labels ($(length(orbital_labels)))"
     end
     
     # File reading and validation
@@ -289,7 +289,7 @@ function MultiOrbitalKSpaceCorrelationAnalysis(filename::String="nn_k.bin", file
     
     filepath = joinpath(filedir, filename)
     if !isfile(filepath)
-        error("File not found: $filepath")
+        @error "File not found: $filepath"
     end
     
     # Read data
