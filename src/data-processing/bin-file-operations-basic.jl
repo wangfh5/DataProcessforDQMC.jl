@@ -649,7 +649,7 @@ end
         coordinate::Union{Tuple{Int, Int}, Tuple{Float64, Float64}};
         output_filename::Union{String, Nothing}=nothing,
         dir::String=pwd(),
-        tolerance::Float64=1e-6,
+        k_point_tolerance::Float64=1e-6,
         verbose::Bool=false
     )
 
@@ -665,7 +665,7 @@ coordinate across all bins. The coordinate can be either:
 - `coordinate::Union{Tuple{Int, Int}, Tuple{Float64, Float64}}`: Target coordinate
 - `output_filename::Union{String, Nothing}=nothing`: Output .bin file name. If nothing, auto-generate from coordinate
 - `dir::String=pwd()`: Working directory
-- `tolerance::Float64=1e-6`: Tolerance for k-space coordinate matching (ignored for r-space)
+- `k_point_tolerance::Float64=1e-6`: Tolerance for k-space coordinate matching (ignored for r-space)
 - `verbose::Bool=false`: Whether to print verbose information
 
 # Returns
@@ -690,7 +690,7 @@ function filter_bin_file(
     coordinate::Union{Tuple{Int, Int}, Tuple{Float64, Float64}};
     output_filename::Union{String, Nothing}=nothing,
     dir::String=pwd(),
-    tolerance::Float64=1e-6,
+    k_point_tolerance::Float64=1e-6,
     verbose::Bool=false
 )
     # Construct input path
@@ -720,7 +720,7 @@ function filter_bin_file(
     end
     
     # Find the coordinate index
-    coord_idx, is_exact = find_coordinate_index(coords, coordinate, tolerance)
+    coord_idx, is_exact = find_coordinate_index(coords, coordinate, k_point_tolerance)
     
     if isnothing(coord_idx)
         @error "Coordinate $coordinate not found in the file"
@@ -737,7 +737,7 @@ function filter_bin_file(
             else
                 dist = sqrt((matched_coord[1] - coordinate[1])^2 + (matched_coord[2] - coordinate[2])^2)
                 println("Found closest k-space coordinate: $matched_coord (distance: $dist) at index $coord_idx")
-                @warn "No exact match found within tolerance $tolerance, using closest point"
+                @warn "No exact match found within tolerance $k_point_tolerance, using closest point"
             end
         end
     end

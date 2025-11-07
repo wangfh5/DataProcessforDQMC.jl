@@ -18,7 +18,7 @@ export AFMCorrelationRatio, CDWCorrelationRatio
                      force_rebuild::Bool=false, startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
                      orbital_columns::Vector{Tuple{Int,Int}}=[(3,4), (5,6), (7,8), (9,10)],
                      orbital_labels::Vector{String}=["AA", "AB", "BA", "BB"],
-                     auto_digits::Bool=true, tolerance::Float64=1e-6, verbose::Bool=true)
+                     auto_digits::Bool=true, k_point_tolerance::Float64=1e-6, verbose::Bool=true)
 
 Calculate the correlation ratio R_{m^2} for antiferromagnetic structure factor, used to quantify disorder-order transitions.
 
@@ -39,7 +39,7 @@ where δq is a small shift in reciprocal space
 - `orbital_columns`: Orbital column indices (default: [(3,4), (5,6), (7,8), (9,10)])
 - `orbital_labels`: Orbital labels (default: ["AA", "AB", "BA", "BB"])
 - `auto_digits`: Whether to automatically determine significant digits (default: true)
-- `tolerance`: Tolerance for matching k-points (default: 1e-6)
+- `k_point_tolerance`: Tolerance for matching k-points (default: 1e-6)
 - `verbose`: Whether to output detailed information (default: true)
 
 ## Returns
@@ -68,7 +68,7 @@ function AFMCorrelationRatio(shift_point::Tuple{<:Real,<:Real}, Q_point::Tuple{<
                          source_file::String="spsm_k.bin", force_rebuild::Bool=false, startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
                          orbital_columns::Vector{Tuple{Int,Int}}=[(3,4), (5,6), (7,8), (9,10)],
                          orbital_labels::Vector{String}=["AA", "AB", "BA", "BB"],
-                         auto_digits::Bool=true, tolerance::Float64=1e-6, verbose::Bool=true)
+                         auto_digits::Bool=true, k_point_tolerance::Float64=1e-6, verbose::Bool=true)
     
     # 计算Q点处的反铁磁结构因子
     if verbose
@@ -77,7 +77,7 @@ function AFMCorrelationRatio(shift_point::Tuple{<:Real,<:Real}, Q_point::Tuple{<
     
     S_AFM_Q = AFMStructureFactor(Q_point, filename, filedir;
                                force_rebuild=force_rebuild, source_file=source_file, startbin=startbin, endbin=endbin, dropmaxmin=dropmaxmin,
-                               auto_digits=auto_digits, tolerance=tolerance, verbose=verbose)
+                               auto_digits=auto_digits, k_point_tolerance=k_point_tolerance, verbose=verbose)
     
     # 计算偏移后的k点坐标
     shift_x, shift_y = shift_point
@@ -91,7 +91,7 @@ function AFMCorrelationRatio(shift_point::Tuple{<:Real,<:Real}, Q_point::Tuple{<
     # 计算偏移点处的反铁磁结构因子（文件已在上一步生成，无需再次 rebuild）
     S_AFM_Q_shifted = AFMStructureFactor(Q_shifted, filename, filedir;
                                        force_rebuild=false, source_file=source_file, startbin=startbin, endbin=endbin, dropmaxmin=dropmaxmin,
-                                       auto_digits=auto_digits, tolerance=tolerance, verbose=verbose)
+                                       auto_digits=auto_digits, k_point_tolerance=k_point_tolerance, verbose=verbose)
     
     # 使用实部计算相关比（通常反铁磁结构因子主要是实部）
     ratio = S_AFM_Q_shifted.mean_real / S_AFM_Q.mean_real
@@ -146,7 +146,7 @@ end
                      force_rebuild::Bool=false, startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
                      orbital_columns::Vector{Tuple{Int,Int}}=[(3,4), (5,6), (7,8), (9,10)],
                      orbital_labels::Vector{String}=["AA", "AB", "BA", "BB"],
-                     auto_digits::Bool=true, tolerance::Float64=1e-6, verbose::Bool=true)
+                     auto_digits::Bool=true, k_point_tolerance::Float64=1e-6, verbose::Bool=true)
 
 Calculate the correlation ratio R_{m^2} for charge density wave structure factor, used to quantify disorder-order transitions.
 
@@ -167,7 +167,7 @@ where δq is a small shift in reciprocal space
 - `orbital_columns`: Orbital column indices (default: [(3,4), (5,6), (7,8), (9,10)])
 - `orbital_labels`: Orbital labels (default: ["AA", "AB", "BA", "BB"])
 - `auto_digits`: Whether to automatically determine significant digits (default: true)
-- `tolerance`: Tolerance for matching k-points (default: 1e-6)
+- `k_point_tolerance`: Tolerance for matching k-points (default: 1e-6)
 - `verbose`: Whether to output detailed information (default: true)
 
 ## Returns
@@ -195,7 +195,7 @@ function CDWCorrelationRatio(shift_point::Tuple{<:Real,<:Real}, Q_point::Tuple{<
                          source_file::String="cdwpair_k.bin", force_rebuild::Bool=false, startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
                          orbital_columns::Vector{Tuple{Int,Int}}=[(3,4), (5,6), (7,8), (9,10)],
                          orbital_labels::Vector{String}=["AA", "AB", "BA", "BB"],
-                         auto_digits::Bool=true, tolerance::Float64=1e-6, verbose::Bool=true)
+                         auto_digits::Bool=true, k_point_tolerance::Float64=1e-6, verbose::Bool=true)
     
     # Calculate CDW structure factor at Q point
     if verbose
@@ -204,7 +204,7 @@ function CDWCorrelationRatio(shift_point::Tuple{<:Real,<:Real}, Q_point::Tuple{<
     
     S_CDW_Q = CDWStructureFactor(Q_point, filename, filedir;
                                force_rebuild=force_rebuild, source_file=source_file, startbin=startbin, endbin=endbin, dropmaxmin=dropmaxmin,
-                               auto_digits=auto_digits, tolerance=tolerance, verbose=verbose)
+                               auto_digits=auto_digits, k_point_tolerance=k_point_tolerance, verbose=verbose)
     
     # Calculate shifted k-point coordinates
     shift_x, shift_y = shift_point
@@ -218,7 +218,7 @@ function CDWCorrelationRatio(shift_point::Tuple{<:Real,<:Real}, Q_point::Tuple{<
     # Calculate CDW structure factor at shifted point (file already generated, no need to rebuild)
     S_CDW_Q_shifted = CDWStructureFactor(Q_shifted, filename, filedir;
                                        force_rebuild=false, source_file=source_file, startbin=startbin, endbin=endbin, dropmaxmin=dropmaxmin,
-                                       auto_digits=auto_digits, tolerance=tolerance, verbose=verbose)
+                                       auto_digits=auto_digits, k_point_tolerance=k_point_tolerance, verbose=verbose)
     
     # Calculate correlation ratio using real part (typically CDW structure factor is mainly real)
     ratio = S_CDW_Q_shifted.mean_real / S_CDW_Q.mean_real

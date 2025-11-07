@@ -29,6 +29,7 @@ makedocs(;
         "Home" => "index.md",
         "预编译指南" => "precompilation.md",
         "Bin Analysis与数据处理指南" => "bin_analysis.md",
+        "结构因子分析设计" => "structure_factor_analysis.md",
         "多参数分析指南" => "multi_parameter_analysis.md",
         "API Reference" => "api.md",
     ],

@@ -49,7 +49,7 @@ result_AB = StructureFactorAnalysis(
     imag_column=6,        # AB orbital imag part (column 6)
     startbin=2,
     dropmaxmin=0,
-    tolerance=1e-6,       # tolerance for k-point matching
+    k_point_tolerance=1e-6,  # tolerance for k-point matching
     verbose=true
 )
 
@@ -98,8 +98,8 @@ df_AB = analyze_structure_factor_multi_parameter(
             imag_column=6,     # Fix: AB orbital imag part
             kwargs...          # Forward relevant parameters (startbin, endbin, etc.)
         ),
+    (0.0, 0.0),            # k-point to analyze (now a positional argument)
     base_dir;              # Base directory to scan
-    k_point=(0.0, 0.0),    # k-point to analyze
     filename="cpcm_k.bin", # Target file
     result_columns=[:mean_real, :err_real, :mean_imag, :err_imag],  # Match StructureFactorAnalysis output
     result_prefix="G_AB",  # Prefix for result columns in DataFrame
@@ -125,8 +125,8 @@ df_nn_AA = analyze_structure_factor_multi_parameter(
             imag_column=4,     # Fix: AA orbital imag part
             kwargs...
         ),
+    (0.5, 0.5),            # k-point to analyze (now a positional argument)
     base_dir;
-    k_point=(0.5, 0.5),
     filename="nn_k.bin",
     result_columns=[:mean_real, :err_real, :mean_imag, :err_imag],
     result_prefix="N_AA",

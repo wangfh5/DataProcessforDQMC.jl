@@ -22,7 +22,7 @@ export analyze_correlation_ratio_multi_parameter,
                                            endbin::Union{Int,Nothing}=nothing,
                                            dropmaxmin::Int=0,
                                            auto_digits::Bool=true,
-                                           tolerance::Float64=1e-6,
+                                           k_point_tolerance::Float64=1e-6,
                                            verbose::Bool=false,
                                            filter_options::Union{Dict, NamedTuple}=Dict()) -> DataFrame
 
@@ -42,7 +42,7 @@ Generic multi-parameter correlation ratio analysis function, suitable for analyz
 - `endbin::Union{Int,Nothing}`: Ending bin for analysis (default: all bins)
 - `dropmaxmin::Int`: Number of max/min values to drop (default: 0)
 - `auto_digits::Bool`: Whether to automatically determine significant digits (default: true)
-- `tolerance::Float64`: Tolerance for matching k-points (default: 1e-6)
+- `k_point_tolerance::Float64`: Tolerance for matching k-points (default: 1e-6)
 - `verbose::Bool`: Whether to output detailed information (default: false)
 - `filter_options::Union{Dict, NamedTuple}`: Options for filtering parameter directories (default: empty Dict)
 
@@ -62,7 +62,7 @@ function analyze_correlation_ratio_multi_parameter(correlation_ratio_function::F
                                            endbin::Union{Int,Nothing}=nothing,
                                            dropmaxmin::Int=0,
                                            auto_digits::Bool=true,
-                                           tolerance::Float64=1e-6,
+                                           k_point_tolerance::Float64=1e-6,
                                            verbose::Bool=false,
                                            filter_options::Union{Dict, NamedTuple}=Dict())
     # Scan parameter directories
@@ -119,7 +119,7 @@ function analyze_correlation_ratio_multi_parameter(correlation_ratio_function::F
                 endbin=endbin, 
                 dropmaxmin=dropmaxmin,
                 auto_digits=auto_digits, 
-                tolerance=tolerance, 
+                k_point_tolerance=k_point_tolerance, 
                 verbose=verbose
             )
             
@@ -165,7 +165,7 @@ end
                                                endbin::Union{Int,Nothing}=nothing,
                                                dropmaxmin::Int=0,
                                                auto_digits::Bool=true,
-                                               tolerance::Float64=1e-6,
+                                               k_point_tolerance::Float64=1e-6,
                                                verbose::Bool=false,
                                                filter_options::Union{Dict, NamedTuple}=Dict()) -> DataFrame
 
@@ -182,7 +182,7 @@ Analyze AFM correlation ratio across multiple parameter directories.
 - `endbin::Union{Int,Nothing}`: Ending bin for analysis (default: all bins)
 - `dropmaxmin::Int`: Number of max/min values to drop (default: 0)
 - `auto_digits::Bool`: Whether to automatically determine significant digits (default: true)
-- `tolerance::Float64`: Tolerance for matching k-points (default: 1e-6)
+- `k_point_tolerance::Float64`: Tolerance for matching k-points (default: 1e-6)
 - `verbose::Bool`: Whether to output detailed information (default: false)
 - `filter_options::Union{Dict, NamedTuple}`: Options for filtering parameter directories (default: empty Dict)
 
@@ -199,7 +199,7 @@ function analyze_AFM_correlation_ratio_multi_parameter(base_dir::AbstractString=
                                                endbin::Union{Int,Nothing}=nothing,
                                                dropmaxmin::Int=0,
                                                auto_digits::Bool=true,
-                                               tolerance::Float64=1e-6,
+                                               k_point_tolerance::Float64=1e-6,
                                                verbose::Bool=false,
                                                filter_options::Union{Dict, NamedTuple}=Dict())
     return analyze_correlation_ratio_multi_parameter(
@@ -216,7 +216,7 @@ function analyze_AFM_correlation_ratio_multi_parameter(base_dir::AbstractString=
         endbin=endbin,
         dropmaxmin=dropmaxmin,
         auto_digits=auto_digits,
-        tolerance=tolerance,
+        k_point_tolerance=k_point_tolerance,
         verbose=verbose,
         filter_options=filter_options
     )
@@ -233,7 +233,7 @@ end
                                                endbin::Union{Int,Nothing}=nothing,
                                                dropmaxmin::Int=0,
                                                auto_digits::Bool=true,
-                                               tolerance::Float64=1e-6,
+                                               k_point_tolerance::Float64=1e-6,
                                                verbose::Bool=false,
                                                filter_options::Union{Dict, NamedTuple}=Dict(),
                                                pattern::Regex=r"^proj_fft_honeycomb") -> DataFrame
@@ -251,7 +251,7 @@ Analyze CDW correlation ratio across multiple parameter directories.
 - `endbin::Union{Int,Nothing}`: Ending bin for analysis (default: all bins)
 - `dropmaxmin::Int`: Number of max/min values to drop (default: 0)
 - `auto_digits::Bool`: Whether to automatically determine significant digits (default: true)
-- `tolerance::Float64`: Tolerance for matching k-points (default: 1e-6)
+- `k_point_tolerance::Float64`: Tolerance for matching k-points (default: 1e-6)
 - `verbose::Bool`: Whether to output detailed information (default: false)
 - `filter_options::Union{Dict, NamedTuple}`: Options for filtering parameter directories (default: empty Dict)
 
@@ -268,7 +268,7 @@ function analyze_CDW_correlation_ratio_multi_parameter(base_dir::AbstractString=
                                                endbin::Union{Int,Nothing}=nothing,
                                                dropmaxmin::Int=0,
                                                auto_digits::Bool=true,
-                                               tolerance::Float64=1e-6,
+                                               k_point_tolerance::Float64=1e-6,
                                                verbose::Bool=false,
                                                filter_options::Union{Dict, NamedTuple}=Dict())
     return analyze_correlation_ratio_multi_parameter(
@@ -285,7 +285,7 @@ function analyze_CDW_correlation_ratio_multi_parameter(base_dir::AbstractString=
         endbin=endbin,
         dropmaxmin=dropmaxmin,
         auto_digits=auto_digits,
-        tolerance=tolerance,
+        k_point_tolerance=k_point_tolerance,
         verbose=verbose,
         filter_options=filter_options
     )
