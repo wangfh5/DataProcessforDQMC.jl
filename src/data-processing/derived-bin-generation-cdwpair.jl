@@ -140,7 +140,7 @@ function create_cdw_from_nn(
         println("  保持不变的列: $preserve_columns")
     end
     
-    # 假设数据列的排列是：AA, AB, BA, BB（实部和虚部交替）
+    # 假设数据列的排列是：AA, BA, AB, BB（实部和虚部交替）
     # 应用η_α η_β因子：AA=+1, AB=-1, BA=-1, BB=+1
     
     # 假设每个轨道有两列（实部和虚部）
@@ -154,17 +154,17 @@ function create_cdw_from_nn(
     column_factors[real_col_aa] = 1.0
     column_factors[imag_col_aa] = 1.0
     
-    # AB轨道：因子 -1
-    real_col_ab = preserve_columns[end] + 3
-    imag_col_ab = real_col_ab + 1
-    column_factors[real_col_ab] = -1.0
-    column_factors[imag_col_ab] = -1.0
-    
-    # BA轨道：因子 -1
-    real_col_ba = preserve_columns[end] + 5
+    # BA轨道：因子 -1（在新顺序中紧随AA）
+    real_col_ba = preserve_columns[end] + 3
     imag_col_ba = real_col_ba + 1
     column_factors[real_col_ba] = -1.0
     column_factors[imag_col_ba] = -1.0
+    
+    # AB轨道：因子 -1（在新顺序中位于第三对）
+    real_col_ab = preserve_columns[end] + 5
+    imag_col_ab = real_col_ab + 1
+    column_factors[real_col_ab] = -1.0
+    column_factors[imag_col_ab] = -1.0
     
     # BB轨道：因子 +1
     real_col_bb = preserve_columns[end] + 7
@@ -175,8 +175,8 @@ function create_cdw_from_nn(
     if verbose
         println("  应用因子：")
         println("    AA轨道 (列 $real_col_aa, $imag_col_aa): +1")
-        println("    AB轨道 (列 $real_col_ab, $imag_col_ab): -1")
         println("    BA轨道 (列 $real_col_ba, $imag_col_ba): -1")
+        println("    AB轨道 (列 $real_col_ab, $imag_col_ab): -1")
         println("    BB轨道 (列 $real_col_bb, $imag_col_bb): +1")
     end
     
@@ -297,8 +297,8 @@ function merge_cdw_sf(
             output_file,
             input_dir,
             output_dir;
-            real_columns=[3, 9, 5, 7],  # [AA, BB, AB, BA] 实部列
-            imag_columns=[4, 10, 6, 8], # [AA, BB, AB, BA] 虚部列
+            real_columns=[3, 9, 7, 5],  # [AA, BB, AB, BA] 实部列 (按AA, BA, AB, BB顺序的列位置)
+            imag_columns=[4, 10, 8, 6], # [AA, BB, AB, BA] 虚部列 (按AA, BA, AB, BB顺序的列位置)
             verbose=verbose
         )
         

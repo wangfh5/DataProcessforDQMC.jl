@@ -15,7 +15,7 @@ Main functions:
 export export_bin_to_dataframe, export_bin_to_csv, export_bin_to_jld2
 export export_directory_bins
 
-const DEFAULT_ORBITAL_LABELS = ["AA", "AB", "BA", "BB"]
+const DEFAULT_ORBITAL_LABELS = ["AA", "BA", "AB", "BB"]
 
 """
     export_bin_to_dataframe(
@@ -37,21 +37,21 @@ for analysis and visualization. It automatically detects the file structure
 - `dir::String=pwd()`: Directory containing the bin file
 - `iscorrelation::Bool=true`: Whether to interpret the file as a correlation function (coordinates + real/imag pairs)
 - `orbital_columns::Union{Vector{Tuple{Int,Int}}, Nothing}=nothing`: Column indices for each orbital pair (real, imag). Auto-generated when `nothing`
-- `orbital_labels::Union{Vector{String}, Nothing}=nothing`: Labels for each orbital pair (defaults to AA/AB/... or pair1/pair2/...)
+- `orbital_labels::Union{Vector{String}, Nothing}=nothing`: Labels for each orbital pair (defaults to AA/BA/... or pair1/pair2/...)
 
 # Returns
 - `DataFrame`: Converted data with columns: bin, coord1, coord2, data columns...
 
 # Data Structure
 The function handles multiple formats:
-1. **Multi-orbital** (default 10 columns): kx, ky, AA_real, AA_imag, AB_real, AB_imag, BA_real, BA_imag, BB_real, BB_imag
+1. **Multi-orbital** (default 10 columns): kx, ky, AA_real, AA_imag, BA_real, BA_imag, AB_real, AB_imag, BB_real, BB_imag
    - Note: AA, AB, BA, BB represent orbital pairs in two-point correlation functions <c†_{i,α} c_{j,β}>
 2. **Custom orbital pairs**: Specify any number of orbital pairs via `orbital_columns` and `orbital_labels`
 3. **Single column** (4 columns): kx, ky, value_real, value_imag
 
 # Examples
 ```julia
-# Export k-space correlation function (default 4 orbital pairs: AA, AB, BA, BB)
+# Export k-space correlation function (default 4 orbital pairs: AA, BA, AB, BB)
 df = export_bin_to_dataframe("nn_k.bin", dir="data/")
 
 # Export only diagonal orbital pairs (AA and BB)
@@ -486,4 +486,3 @@ function export_directory_bins(
     
     return exported_files
 end
-

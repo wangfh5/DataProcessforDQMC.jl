@@ -190,8 +190,8 @@ function merge_afm_sf(
             output_file,
             input_dir,
             output_dir;
-            real_columns=[3, 9, 5, 7],  # [AA, BB, AB, BA] 实部列
-            imag_columns=[4, 10, 6, 8], # [AA, BB, AB, BA] 虚部列
+            real_columns=[3, 9, 7, 5],  # [AA, BB, AB, BA] 实部列
+            imag_columns=[4, 10, 8, 6], # [AA, BB, AB, BA] 虚部列
             verbose=false
         )
         

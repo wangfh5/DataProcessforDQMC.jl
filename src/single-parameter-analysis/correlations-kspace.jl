@@ -240,7 +240,7 @@ end
     MultiOrbitalKSpaceCorrelationAnalysis(filename="nn_k.bin", filedir=pwd();
                                         startbin=2, endbin=nothing, dropmaxmin=0,
                                         orbital_columns=[(3,4), (5,6), (7,8), (9,10)],
-                                        orbital_labels=["AA", "AB", "BA", "BB"],
+                                        orbital_labels=["AA", "BA", "AB", "BB"],
                                         auto_digits=true,
                                         verbose=true)
 
@@ -254,7 +254,7 @@ Arguments:
 - `endbin`: Last bin to include in analysis (default: all bins)
 - `dropmaxmin`: Number of maximum and minimum values to drop (default: 0)
 - `orbital_columns`: Array of (real_column, imag_column) tuples for each orbital (default: [(3,4), (5,6), (7,8), (9,10)])
-- `orbital_labels`: Array of labels for each orbital (default: ["AA", "AB", "BA", "BB"])
+- `orbital_labels`: Array of labels for each orbital (default: ["AA", "BA", "AB", "BB"])
 - `auto_digits`: Whether to automatically determine significant digits based on error of error (default: true)
 - `verbose`: Whether to print results to console (default: true)
 
@@ -274,7 +274,7 @@ corr_1_1_AB_imag = results[1, :AB_mean_imag]  # mean imag value at first row for
 function MultiOrbitalKSpaceCorrelationAnalysis(filename::String="nn_k.bin", filedir::String=pwd();
                                              startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
                                              orbital_columns::Vector{Tuple{Int,Int}}=[(3,4), (5,6), (7,8), (9,10)],
-                                             orbital_labels::Vector{String}=["AA", "AB", "BA", "BB"],
+                                             orbital_labels::Vector{String}=["AA", "BA", "AB", "BB"],
                                              auto_digits::Bool=true,
                                              verbose::Bool=true)
     # Validate inputs

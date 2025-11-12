@@ -466,8 +466,8 @@ end
         output_filename::String="afm_sf_k.bin",
         input_dir::String=pwd(),
         output_dir::String=pwd();
-        real_columns::Vector{Int}=[3, 9, 5, 7],  # [AA, BB, AB, BA] 实部列
-        imag_columns::Vector{Int}=[4, 10, 6, 8], # [AA, BB, AB, BA] 虚部列
+        real_columns::Vector{Int}=[3, 9, 7, 5],  # [AA, BB, AB, BA] 实部列
+        imag_columns::Vector{Int}=[4, 10, 8, 6], # [AA, BB, AB, BA] 虚部列
         preserve_columns::UnitRange{Int}=1:2,
         verbose::Bool=false
     )
@@ -483,8 +483,8 @@ end
 - `output_filename::String="afm_sf_k.bin"`: 输出文件名
 - `input_dir::String=pwd()`: 输入目录，默认为当前目录
 - `output_dir::String=pwd()`: 输出目录，默认为当前目录
-- `real_columns::Vector{Int}=[3, 9, 5, 7]`: 实部列索引数组，顺序为[A, B, C, D]
-- `imag_columns::Vector{Int}=[4, 10, 6, 8]`: 虚部列索引数组，顺序为[A, B, C, D]
+- `real_columns::Vector{Int}=[3, 9, 7, 5]`: 实部列索引数组，顺序为[A, B, C, D]
+- `imag_columns::Vector{Int}=[4, 10, 8, 6]`: 虚部列索引数组，顺序为[A, B, C, D]
 - `preserve_columns::UnitRange{Int}=1:2`: 要保留的列范围，默认为1:2（通常是k点坐标）
 - `verbose::Bool=false`: 是否输出详细信息，默认为false
 
@@ -513,8 +513,8 @@ function merge_staggered_components(
     output_filename::String="afm_sf_k.bin",
     input_dir::String=pwd(),
     output_dir::String=pwd();
-    real_columns::Vector{Int}=[3, 9, 5, 7],  # [A, B, C, D] 实部列
-    imag_columns::Vector{Int}=[4, 10, 6, 8], # [A, B, C, D] 虚部列
+    real_columns::Vector{Int}=[3, 9, 7, 5],  # [A, B, C, D] 实部列 (按AA, BA, AB, BB顺序的列位置)
+    imag_columns::Vector{Int}=[4, 10, 8, 6], # [A, B, C, D] 虚部列 (按AA, BA, AB, BB顺序的列位置)
     preserve_columns::UnitRange{Int}=1:2,
     verbose::Bool=false
 )
@@ -556,8 +556,8 @@ end
         output_filename::String="cdwpair_sf_k.bin",
         input_dir::String=pwd(),
         output_dir::String=pwd();
-        real_columns::Vector{Int}=[3, 9, 5, 7],  # [A, B, C, D] 实部列
-        imag_columns::Vector{Int}=[4, 10, 6, 8], # [A, B, C, D] 虚部列
+        real_columns::Vector{Int}=[3, 9, 7, 5],  # [A, B, C, D] 实部列 (按AA, BA, AB, BB顺序的列位置)
+        imag_columns::Vector{Int}=[4, 10, 8, 6], # [A, B, C, D] 虚部列 (按AA, BA, AB, BB顺序的列位置)
         preserve_columns::UnitRange{Int}=1:2,
         verbose::Bool=false
     )
@@ -573,8 +573,8 @@ end
 - `output_filename::String="cdwpair_sf_k.bin"`: 输出文件名
 - `input_dir::String=pwd()`: 输入目录，默认为当前目录
 - `output_dir::String=pwd()`: 输出目录，默认为当前目录
-- `real_columns::Vector{Int}=[3, 9, 5, 7]`: 实部列索引数组，顺序为[A, B, C, D]
-- `imag_columns::Vector{Int}=[4, 10, 6, 8]`: 虚部列索引数组，顺序为[A, B, C, D]
+- `real_columns::Vector{Int}=[3, 9, 7, 5]`: 实部列索引数组，顺序为[A, B, C, D]
+- `imag_columns::Vector{Int}=[4, 10, 8, 6]`: 虚部列索引数组，顺序为[A, B, C, D]
 - `preserve_columns::UnitRange{Int}=1:2`: 要保留的列范围，默认为1:2（通常是k点坐标）
 - `verbose::Bool=false`: 是否输出详细信息，默认为false
 
@@ -603,8 +603,8 @@ function merge_uniform_components(
     output_filename::String="cdwpair_sf_k.bin",
     input_dir::String=pwd(),
     output_dir::String=pwd();
-    real_columns::Vector{Int}=[3, 9, 5, 7],  # [A, B, C, D] 实部列
-    imag_columns::Vector{Int}=[4, 10, 6, 8], # [A, B, C, D] 虚部列
+    real_columns::Vector{Int}=[3, 9, 7, 5],  # [A, B, C, D] 实部列 (按AA, BA, AB, BB顺序的列位置)
+    imag_columns::Vector{Int}=[4, 10, 8, 6], # [A, B, C, D] 虚部列 (按AA, BA, AB, BB顺序的列位置)
     preserve_columns::UnitRange{Int}=1:2,
     verbose::Bool=false
 )

@@ -17,7 +17,7 @@ export AFMCorrelationRatio, CDWCorrelationRatio
                      filename::String="afm_sf_k.bin", source_file::String="spsm_k.bin", filedir::String=pwd();
                      force_rebuild::Bool=false, startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
                      orbital_columns::Vector{Tuple{Int,Int}}=[(3,4), (5,6), (7,8), (9,10)],
-                     orbital_labels::Vector{String}=["AA", "AB", "BA", "BB"],
+                     orbital_labels::Vector{String}=["AA", "BA", "AB", "BB"],
                      auto_digits::Bool=true, k_point_tolerance::Float64=1e-6, verbose::Bool=true)
 
 Calculate the correlation ratio R_{m^2} for antiferromagnetic structure factor, used to quantify disorder-order transitions.
@@ -37,7 +37,7 @@ where δq is a small shift in reciprocal space
 - `endbin`: Ending bin (default: all bins)
 - `dropmaxmin`: Number of max/min values to drop (default: 0)
 - `orbital_columns`: Orbital column indices (default: [(3,4), (5,6), (7,8), (9,10)])
-- `orbital_labels`: Orbital labels (default: ["AA", "AB", "BA", "BB"])
+- `orbital_labels`: Orbital labels (default: ["AA", "BA", "AB", "BB"])
 - `auto_digits`: Whether to automatically determine significant digits (default: true)
 - `k_point_tolerance`: Tolerance for matching k-points (default: 1e-6)
 - `verbose`: Whether to output detailed information (default: true)
@@ -67,7 +67,7 @@ function AFMCorrelationRatio(shift_point::Tuple{<:Real,<:Real}, Q_point::Tuple{<
                          filename::String="afm_sf_k.bin", filedir::String=pwd();
                          source_file::String="spsm_k.bin", force_rebuild::Bool=false, startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
                          orbital_columns::Vector{Tuple{Int,Int}}=[(3,4), (5,6), (7,8), (9,10)],
-                         orbital_labels::Vector{String}=["AA", "AB", "BA", "BB"],
+                         orbital_labels::Vector{String}=["AA", "BA", "AB", "BB"],
                          auto_digits::Bool=true, k_point_tolerance::Float64=1e-6, verbose::Bool=true)
     
     # 计算Q点处的反铁磁结构因子
@@ -145,7 +145,7 @@ end
                      filename::String="cdwpair_sf_k.bin", source_file::String="cdwpair_k.bin", filedir::String=pwd();
                      force_rebuild::Bool=false, startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
                      orbital_columns::Vector{Tuple{Int,Int}}=[(3,4), (5,6), (7,8), (9,10)],
-                     orbital_labels::Vector{String}=["AA", "AB", "BA", "BB"],
+                     orbital_labels::Vector{String}=["AA", "BA", "AB", "BB"],
                      auto_digits::Bool=true, k_point_tolerance::Float64=1e-6, verbose::Bool=true)
 
 Calculate the correlation ratio R_{m^2} for charge density wave structure factor, used to quantify disorder-order transitions.
@@ -165,7 +165,7 @@ where δq is a small shift in reciprocal space
 - `endbin`: Ending bin (default: all bins)
 - `dropmaxmin`: Number of max/min values to drop (default: 0)
 - `orbital_columns`: Orbital column indices (default: [(3,4), (5,6), (7,8), (9,10)])
-- `orbital_labels`: Orbital labels (default: ["AA", "AB", "BA", "BB"])
+- `orbital_labels`: Orbital labels (default: ["AA", "BA", "AB", "BB"])
 - `auto_digits`: Whether to automatically determine significant digits (default: true)
 - `k_point_tolerance`: Tolerance for matching k-points (default: 1e-6)
 - `verbose`: Whether to output detailed information (default: true)
@@ -194,7 +194,7 @@ function CDWCorrelationRatio(shift_point::Tuple{<:Real,<:Real}, Q_point::Tuple{<
                          filename::String="cdwpair_sf_k.bin", filedir::String=pwd();
                          source_file::String="cdwpair_k.bin", force_rebuild::Bool=false, startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
                          orbital_columns::Vector{Tuple{Int,Int}}=[(3,4), (5,6), (7,8), (9,10)],
-                         orbital_labels::Vector{String}=["AA", "AB", "BA", "BB"],
+                         orbital_labels::Vector{String}=["AA", "BA", "AB", "BB"],
                          auto_digits::Bool=true, k_point_tolerance::Float64=1e-6, verbose::Bool=true)
     
     # Calculate CDW structure factor at Q point
