@@ -149,7 +149,9 @@ function analyze_correlation_ratio_multi_parameter(correlation_ratio_function::F
     end
     
     # Sort DataFrame by parameters
-    sort!(df, [:b, :U, :L, :dtau])
+    # Sort DataFrame by parameters
+    param_cols = sort(collect(keys(first_params)))
+    sort!(df, param_cols)
     
     return df
 end

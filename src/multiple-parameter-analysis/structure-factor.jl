@@ -219,8 +219,9 @@ function analyze_structure_factor_multi_parameter(analyzer_function::Function,
         return DataFrame()
     end
     
-    # Sort by (b, U, L, dtau)
-    sort!(result_df, [:b, :U, :L, :dtau])
+    # Sort by parameters
+    param_cols = sort(collect(keys(first_params)))
+    sort!(result_df, param_cols)
     
     return result_df
 end
@@ -351,8 +352,10 @@ function analyze_structure_factor_multi_parameter(analyzer_function::Function,
         return DataFrame()
     end
     
-    # Sort by (b, U, L, dtau, kx, ky)
-    sort!(result_df, [:b, :U, :L, :dtau, :kx, :ky])
+    # Sort by parameters + kx, ky
+    param_cols = sort(collect(keys(first_params)))
+    sort_cols = vcat(param_cols, [:kx, :ky])
+    sort!(result_df, sort_cols)
     
     return result_df
 end

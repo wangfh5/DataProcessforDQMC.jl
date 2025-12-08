@@ -129,14 +129,14 @@ function combine_bin_files(output_filename::String,
         
         # 检查数据结构是否兼容
         if size(data) != size(result_data)
-            @error "文件 $filename 的数据结构与其他文件不兼容"
+            @error "文件 $input_dir/$filename 的数据结构与其他文件不兼容"
             return ""
         end
         
         # 检查保留列是否匹配
         for col in preserve_columns
             if !all(isapprox.(data[:, col], first_file_data[:, col]))
-                @warn "文件 $filename 的保留列 $col 与第一个文件不完全匹配"
+                @warn "文件 $input_dir/$filename 的保留列 $col 与第一个文件不完全匹配" 
             end
         end
         
