@@ -208,28 +208,35 @@ format_value_error(2367.38, 23; format=:decimal)         # ("2370", "30")
 ```
 """
 function format_value_error(value::Number, error::Number, error_sig_digits::Int=1; format::Symbol=:scientific)
-
     # Step 1: Determine the digits of the error based on its significant digits and error
-    # For example
-    # - If error = 23456, error_sig_digits = 1, error_digits = - 4;
-    # - If error = 23456, error_sig_digits = 2, error_digits = - 4 + 2 - 1 = - 3;
-    # - If error = 2.3456, error_sig_digits = 1, error_digits = 0;
-    # - If error = 2.3456, error_sig_digits = 3, error_digits = 0 + 3 - 1 = 2;
-    # Handle the case where error is exactly zero
     if error == 0.0
+        # Handle the case where error is exactly zero
+        rounded_error = 0.0
         error_order = 0
         error_digits = error_sig_digits - 1
-        rounded_error = 0.0
     else
-        # For non-zero errors, calculate order of magnitude
-        error_order = floor(log10(abs(error)))
+        # Round the error first, then derive its order; this keeps value precision in sync
+        rounded_error = round(error, RoundUp, sigdigits=error_sig_digits)
+        # For non-zero errors, calculate order of magnitude (err = x.x × 10^error_order)
+        # For example
+        # - If error = 23456, error_order = 4;
+        # - If error = 2.3456, error_order = 0;
+        # - If error = 0.00943, error_sig_digits = 2, rounded_error = 0.0095, error_order = -3;
+        # - If error = 0.00943, error_sig_digits = 1, rounded_error = 0.01, error_order = -2;
+        error_order = floor(log10(abs(rounded_error)))
         # Check if error_order is -Inf (can happen with very small numbers due to floating point precision)
         if isinf(error_order)
             # Use the smallest representable order for very small numbers
             error_order = -324  # Approximately the smallest exponent for Float64
         end
+        # For example
+        # - If error = 23456, error_sig_digits = 1, error_digits = - 4;
+        # - If error = 23456, error_sig_digits = 2, error_digits = - 4 + 2 - 1 = - 3;
+        # - If error = 2.3456, error_sig_digits = 1, error_digits = 0;
+        # - If error = 2.3456, error_sig_digits = 3, error_digits = 0 + 3 - 1 = 2;
+        # - If error = 0.00943, error_sig_digits = 2, error_digits = 3 + 2 - 1 = 4;
+        # - If error = 0.00943, error_sig_digits = 1, error_digits = 2 + 1 - 1 = 2;
         error_digits = - Int(error_order - error_sig_digits + 1)
-        rounded_error = round(error, RoundUp, sigdigits=error_sig_digits)
     end
 
     # Step 2: Round the value to match the precision of the error

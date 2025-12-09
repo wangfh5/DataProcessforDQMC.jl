@@ -2,5 +2,5 @@ using DataProcessforDQMC
 using Test
 
 @testset "DataProcessforDQMC.jl" begin
-    # Write your tests here.
+    include("statistics_format_value_error_test.jl")
 end
