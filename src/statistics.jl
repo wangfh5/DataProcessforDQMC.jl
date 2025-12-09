@@ -182,35 +182,32 @@ function round_error(error_val::Complex{T}, error_of_error::Complex{T}) where T 
 end
 
 """
-    format_value_error(value, error, error_sig_digits=1)
-Format a value and its error with appropriate precision using scientific notation.
+    format_value_error(value, error, error_sig_digits=1; format=:scientific)
+格式化数值及其误差，支持科学计数法或普通小数表示。
 
-The error is formatted to the specified number of significant digits.
-The value is rounded to match the precision of the error.
+误差会按照给定的有效数字数目进行向上取整，数值会匹配同样的精度。
 
-Arguments:
-- `value`: The main value to format
-- `error`: The error/uncertainty of the value
-- `error_sig_digits`: Number of significant digits to use for the error (default: 1)
+参数:
+- `value`: 待格式化的数值
+- `error`: 该数值的误差
+- `error_sig_digits`: 误差保留的有效数字个数 (默认: 1)
+- `format`: 输出格式，`:scientific`(默认) 返回科学计数法字符串，`:decimal` 返回普通小数
 
-Returns:
-- Tuple of (formatted_value, formatted_error) as strings in scientific notation
+返回:
+- `(formatted_value, formatted_error)` 字符串元组，格式由 `format` 决定
 
-Examples:
+示例:
 ```julia
-# Default 1 significant digit for error
-format_value_error(2.36738, 0.0023)     # Returns ("2.367e+00", "0.003e0")
-format_value_error(2.36738, 0.00023)    # Returns ("2.3674e+00", "0.0003e0")
+# 科学计数法 (默认)
+format_value_error(2.36738, 0.0023)                      # ("2.367e+00", "0.003e0")
+format_value_error(2367.38, 23, 2)                       # ("2.367e+03", "0.023e3")
 
-# With 2 significant digits for error
-format_value_error(2.36738, 0.0023, 2)  # Returns ("2.3674e+00", "0.0023e0")
-
-# Large numbers
-format_value_error(2367.38, 23)         # Returns ("2.37e+03", "0.03e3")
-format_value_error(2367.38, 23, 2)      # Returns ("2.367e+03", "0.023e3")
+# 普通小数
+format_value_error(2.36738, 0.0023; format=:decimal)     # ("2.367", "0.003")
+format_value_error(2367.38, 23; format=:decimal)         # ("2370", "30")
 ```
 """
-function format_value_error(value::Number, error::Number, error_sig_digits::Int=1)
+function format_value_error(value::Number, error::Number, error_sig_digits::Int=1; format::Symbol=:scientific)
 
     # Step 1: Determine the digits of the error based on its significant digits and error
     # For example
@@ -258,24 +255,40 @@ function format_value_error(value::Number, error::Number, error_sig_digits::Int=
         value_sig_digits = Int(value_order) + 1 + value_digits
     end
 
-    # Step 4: Format the value and error as strings in scientific notation
-    # For clarity, the exponents are printed to be the same for both values
-    # Value is automatically formatted, while error is formatted manually
-    # For example
-    # - If value = 2.36738, error = 0.0023, error_sig_digits = 1, then we want 2.367e+00 and 0.003e+00
-    # - If value = 2.36738, error = 0.0023, error_sig_digits = 2, then we want 2.3674e+00 and 0.0023e+00
-    # - If value = 2367.38, error = 23, error_sig_digits = 1, then we want 2.37e+03 and 0.03e+03
-    # - If value = 2367.38, error = 23, error_sig_digits = 2, then we want 2.367e+03 and 0.023e+03
-    val_str = @sprintf("%.*e", value_sig_digits - 1, rounded_val)
+    # Step 4: Format the value and error as strings
     err_exponent = Int(value_order)  # Safe now because we've handled the zero case above
 
-    # Handle the case where error is effectively zero
-    if rounded_error == 0.0
-        err_str = "0e$(err_exponent)"
+    if format == :scientific
+        # Format as scientific notation
+        # For clarity, the exponents are printed to be the same for both values
+        # Value is automatically formatted, while error is formatted manually
+        # For example
+        # - If value = 2.36738, error = 0.0023, error_sig_digits = 1, then we want 2.367e+00 and 0.003e+00
+        # - If value = 2.36738, error = 0.0023, error_sig_digits = 2, then we want 2.3674e+00 and 0.0023e+00
+        # - If value = 2367.38, error = 23, error_sig_digits = 1, then we want 2.37e+03 and 0.03e+03
+        # - If value = 2367.38, error = 23, error_sig_digits = 2, then we want 2.367e+03 and 0.023e+03
+        val_str = @sprintf("%.*e", value_sig_digits - 1, rounded_val)
+
+        if rounded_error == 0.0
+            err_str = "0e$(err_exponent)"
+        else
+            err_magnitude = abs(rounded_error) / 10.0^err_exponent
+            rounded_error_format = round(err_magnitude, sigdigits=error_sig_digits)
+            err_str = "$(rounded_error_format)e$(err_exponent)"
+        end
+    elseif format == :decimal
+        # Format as plain decimal
+        # Both value and error are rounded to match precision, then printed with fixed decimal places
+        # For example
+        # - If value = 2.36738, error = 0.0023, error_sig_digits = 1, then we want "2.367" and "0.003"
+        # - If value = 2367.38, error = 23, error_sig_digits = 1, then we want "2370" and "30"
+        value_decimal_digits = max(value_digits, 0)
+        error_decimal_digits = max(error_digits, 0)
+
+        val_str = @sprintf("%.*f", value_decimal_digits, rounded_val)
+        err_str = @sprintf("%.*f", error_decimal_digits, rounded_error)
     else
-        err_magnitude = abs(rounded_error) / 10.0^err_exponent
-        rounded_error_format = round(err_magnitude, sigdigits=error_sig_digits)
-        err_str = "$(rounded_error_format)e$(err_exponent)"
+        throw(ArgumentError("format must be :scientific or :decimal, got $format"))
     end
 
     return val_str, err_str
