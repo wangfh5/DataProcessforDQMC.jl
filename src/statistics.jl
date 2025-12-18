@@ -3,6 +3,7 @@ using DataFrames
 using Printf
 
 export error, round_error, format_value_error
+export iqr_fence_filter
 
 ## -------------------------------------------------------------------------- ##
 ##                                   Filters                                  ##
@@ -53,6 +54,76 @@ function filter(data::Vector{Complex{T}}, dropnum::Int64=1) where T <: AbstractF
 
     # Remove the dropnum smallest and largest values
     return data[sorted_indices[(dropnum+1):(end-dropnum)]]
+end
+
+"""
+    iqr_fence_filter(values; k=10.0, min_n=8)
+
+Apply Tukey's IQR fence to remove extreme outliers.
+
+Given samples `x₁,…,xₙ`, define the quartiles:
+
+    Q₁ = quantile(x, 0.25),   Q₃ = quantile(x, 0.75),   IQR = Q₃ − Q₁
+
+and the Tukey fences:
+
+    L = Q₁ − k·IQR,    U = Q₃ + k·IQR
+
+We keep `S = { xᵢ | L ≤ xᵢ ≤ U }` and treat the rest as outliers.
+
+This function is designed for situations where **a tiny number of extreme algorithmic outliers**
+(e.g. pathological bootstrap fits) can destroy plain mean/std.
+
+# Behaviour / edge cases
+- Non-finite values (`NaN`, `Inf`) and `missing` are ignored before computing quantiles.
+- If the number of finite samples is `< min_n`, no fence is applied (returns input finite values).
+- If `IQR == 0` or non-finite, no fence is applied.
+- If the fence would remove all samples, we fall back to the original finite values.
+
+# Returns
+`(filtered_values::Vector{Float64}, n_removed::Int)`
+
+where `n_removed` counts only the number of values removed by the fence (not NaN/Inf/missing).
+
+# Parameters
+- `k`: fence multiplier. Typical boxplot values: 1.5 (mild) or 3 (extreme).
+       Use large `k` (e.g. 10) if you only want to remove **very extreme** outliers.
+- `min_n`: minimum number of samples required to apply the fence.
+"""
+function iqr_fence_filter(values; k::Real=10.0, min_n::Int=8)
+    # Collect finite numeric values; ignore missing/NaN/Inf.
+    vals = Float64[]
+    for v in values
+        if ismissing(v)
+            continue
+        end
+        x = Float64(v)
+        isfinite(x) || continue
+        push!(vals, x)
+    end
+
+    n = length(vals)
+    if n < min_n
+        return vals, 0
+    end
+
+    q1 = quantile(vals, 0.25)
+    q3 = quantile(vals, 0.75)
+    iqr = q3 - q1
+    if !(isfinite(iqr) && iqr > 0)
+        return vals, 0
+    end
+
+    lo = q1 - Float64(k) * iqr
+    hi = q3 + Float64(k) * iqr
+
+    # NOTE: This module defines its own `filter(x::Vector, dropnum)` for trimming
+    # extrema, so use a comprehension here (or `Base.filter`) to avoid name clash.
+    filtered = [x for x in vals if lo <= x <= hi]
+    if isempty(filtered)
+        return vals, 0
+    end
+    return filtered, n - length(filtered)
 end
 
 ## -------------------------------------------------------------------------- ##
