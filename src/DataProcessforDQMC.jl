@@ -24,10 +24,6 @@ export compile, @Algorithm_str, Algorithm
 # Basis statistical functions
 include("statistics.jl")
 
-# Legacy functions - based on dataframes.jl
-include("format-dataframes.jl")
-include("read-dataframes.jl")
-
 # Data processing utilities
 include("data-processing/bin-file-operations-basic.jl")
 include("data-processing/bin-file-export.jl")

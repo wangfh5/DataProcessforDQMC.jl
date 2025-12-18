@@ -174,26 +174,6 @@ function error(data; sigma=1, bessel=true, auto_digits=true)
     return result
 end
 
-"""
-    mean_ns(data)
-mean without spikes: Calculate the mean of the data after removing the largest and smallest value.
-#!deprecated
-"""
-function mean_ns(data)
-    sort_data = sort(data)
-    mean(sort_data[2:end-1])
-end
-
-"""
-    error_ns(data)
-error without spikes: Calculate the error of the data after removing the largest and smallest value.
-#!deprecated
-"""
-function error_ns(data)
-    n = length(data)
-    sort_data = sort(data)
-    3*std(sort_data[2:end-1])/sqrt(n-2)
-end
 
 ## -------------------------------------------------------------------------- ##
 ##                                Format error                                ##
@@ -416,41 +396,4 @@ function compute_stats(real_values, imag_values; auto_digits=true)
         formatted_real = "$(formatted_real) ± $(formatted_real_err)",
         formatted_imag = "$(formatted_imag) ± $(formatted_imag_err)"
     )
-end
-
-"""
-    statistics_columns(df_tmp::DataFrame)
-average and error of each column of a dataframe with only `bin` and data columns.
-#!deprecated
-"""
-function statistics_columns(df_tmp::DataFrame)
-    df_tmp = bin_filter(df_tmp)
-    # calculate the mean and error of each column
-    mean_values = mean.(eachcol(df_tmp))
-    error_values = error.(eachcol(df_tmp))
-    # 创建一个存储统计信息的空 DataFrame
-    df_stats = DataFrame()
-    # 将每一列的平均值和标准差添加到新的 DataFrame 中
-    for (colname, mean_val, error_val) in zip(names(df_tmp), mean_values, error_values)
-        df_stats[!, Symbol(colname, "_mean")] = [mean_val]
-        df_stats[!, Symbol(colname, "_error")] = [error_val]
-    end
-    return df_stats
-end
-
-
-"""
-    statistics_columns_withparas(df_tmp::DataFrame, paras)
-average and error of a dataframe with `bin` column, parameter columns specified by `paras` (symbols) and data columns.
-#!deprecated
-"""
-function statistics_columns_withparas(df_tmp; paras=nothing)
-    df_tmp = bin_filter(df_tmp)
-    # find the data names
-    datavec = setdiff(Symbol.(names(df_tmp)), paras)
-    datamat = reshape(datavec, 1, :)
-    # group and combine
-    gdf = groupby(df_tmp, paras)
-    df_stat = combine(gdf, datamat .=> [mean, error])
-    return df_stat
 end
