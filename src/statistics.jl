@@ -3,61 +3,14 @@ using DataFrames
 using Printf
 
 export error, round_error, format_value_error
-export iqr_fence_filter
+export iqr_fence_filter, remove_outliers
 
 ## -------------------------------------------------------------------------- ##
 ##                                   Filters                                  ##
 ## -------------------------------------------------------------------------- ##
 
 """
-    bin_filter(df::DataFrame)
-Remove the first `ntherm` bins from `df`. `df` should have a column named `bin`.
-"""
-@inline function bin_filter(df::DataFrame;ntherm=1::Int64)
-    # filter data
-    df_filter = df[df.bin .> ntherm,:]
-    # remove the bin column
-    select!(df_filter, Not(:bin))
-    df_filter
-end
-
-"""
-    k_filter(df::DataFrame, k::Tuple{Float64,Float64})
-Filter the data at k = (kx,ky).
-"""
-@inline function k_filter(df::DataFrame, k::Tuple{Float64,Float64})
-    # filter data
-    df_filter = df[(df.kx .== k[1]) .& (df.ky .== k[2]),:]
-    # remove the kx, ky column
-    select!(df_filter, Not(:kx))
-    select!(df_filter, Not(:ky))
-    df_filter
-end
-
-"""
-Remove the max and min of the data
-"""
-function filter(onecolumndata::Array{Float64,1}, dropnum::Int64=1)
-    onecolumndata_sort = sort(onecolumndata)
-    return onecolumndata_sort[1+dropnum:end-dropnum]
-end
-function filter(multicolumnsdata::Array{Float64,2}, dropnum::Int64=1)
-    return hcat([filter(multicolumnsdata[:,i], dropnum) for i in 1:size(multicolumnsdata,2)]...)
-end
-function filter(data::Vector{Complex{T}}, dropnum::Int64=1) where T <: AbstractFloat
-    if length(data) <= 2*dropnum
-        return data
-    end
-
-    # Sort by magnitude
-    sorted_indices = sortperm(abs.(data))
-
-    # Remove the dropnum smallest and largest values
-    return data[sorted_indices[(dropnum+1):(end-dropnum)]]
-end
-
-"""
-    iqr_fence_filter(values; k=10.0, min_n=8)
+    iqr_fence_filter(values; k=10.0, min_n=5)
 
 Apply Tukey's IQR fence to remove extreme outliers.
 
@@ -88,9 +41,9 @@ where `n_removed` counts only the number of values removed by the fence (not NaN
 # Parameters
 - `k`: fence multiplier. Typical boxplot values: 1.5 (mild) or 3 (extreme).
        Use large `k` (e.g. 10) if you only want to remove **very extreme** outliers.
-- `min_n`: minimum number of samples required to apply the fence.
+- `min_n`: minimum number of samples required to apply the fence. Defaults to 5.
 """
-function iqr_fence_filter(values; k::Real=10.0, min_n::Int=8)
+function iqr_fence_filter(values; k::Real=10.0, min_n::Int=5)
     # Collect finite numeric values; ignore missing/NaN/Inf.
     vals = Float64[]
     for v in values
@@ -117,13 +70,45 @@ function iqr_fence_filter(values; k::Real=10.0, min_n::Int=8)
     lo = q1 - Float64(k) * iqr
     hi = q3 + Float64(k) * iqr
 
-    # NOTE: This module defines its own `filter(x::Vector, dropnum)` for trimming
-    # extrema, so use a comprehension here (or `Base.filter`) to avoid name clash.
     filtered = [x for x in vals if lo <= x <= hi]
     if isempty(filtered)
         return vals, 0
     end
     return filtered, n - length(filtered)
+end
+
+"""
+    remove_outliers(values, mode, param; min_n=5)
+
+统一的离群值处理入口。
+
+- `mode` 可用 `:dropmaxmin` / `"dropmaxmin"` 或 `:iqrfence` / `"iqrfence"`.
+- `param` 含义：
+    - dropmaxmin 模式：整数，表示要去掉的 max/min 个数
+    - iqrfence 模式：正实数，Tukey IQR fence 的倍数 k
+- `min_n`：样本少于该值时不做过滤（默认 5）。
+
+返回过滤后的向量；原始顺序会被破坏（与旧的 trim 行为一致）。
+"""
+function remove_outliers(values::AbstractVector, mode, param; min_n::Int=5)
+    m = Symbol(lowercase(String(mode)))
+    if m == :dropmaxmin
+        dropnum = Int(param)
+        dropnum < 0 && throw(ArgumentError("dropmaxmin must be >= 0, got $dropnum"))
+        n = length(values)
+        if n < min_n || n <= 2 * dropnum
+            return collect(values)
+        end
+        sorted_vals = sort(collect(values))
+        return sorted_vals[(dropnum + 1):(n - dropnum)]
+    elseif m == :iqrfence
+        k = Float64(param)
+        k <= 0 && throw(ArgumentError("iqrfence k must be > 0, got $k"))
+        filtered, _ = iqr_fence_filter(values; k=k, min_n=min_n)
+        return filtered
+    else
+        throw(ArgumentError("mode must be :dropmaxmin or :iqrfence, got $mode"))
+    end
 end
 
 ## -------------------------------------------------------------------------- ##

@@ -17,8 +17,29 @@ export RenyiNegativity, RenyiNegativity_all
 ##                              Renyi Negativity                              ##
 ## -------------------------------------------------------------------------- ##
 
+"""
+    RenyiNegativity(filename, filedir=pwd(); printLA=nothing, startbin=3, endbin=nothing,
+                    outlier_mode=:dropmaxmin, outlier_param=1)
+
+Calculate Renyi negativity from expRenyiN*.bin files.
+
+# Arguments
+- `filename`: Name of the Renyi negativity file (e.g., "expRenyiN3.bin")
+- `filedir`: Directory containing the file (default: current directory)
+- `printLA`: Which LA values to print (default: all)
+- `startbin`: First bin to include (default: 3)
+- `endbin`: Last bin to include, inclusive (default: all bins)
+- `outlier_mode`: `:dropmaxmin` (trim extremes) or `:iqrfence` (Tukey IQR fence).
+- `outlier_param`: For `:dropmaxmin`, number of max/min values to trim (integer, default 1).
+                  For `:iqrfence`, positive Real k multiplier for IQR.
+
+# Returns
+- `(expRenyiN, RenyiN)`: Arrays of shape (L+1, 2) with [mean, error] for each LA.
+"""
 function RenyiNegativity(filename::String, filedir::String=pwd();
-    printLA=nothing, startbin::Int=3, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=1)
+    printLA=nothing, startbin::Int=3, endbin::Union{Int,Nothing}=nothing,
+    outlier_mode::Symbol=:dropmaxmin, outlier_param::Real=1)
+
     # Add .bin extension if not present
     if !endswith(filename, ".bin")
         filename = filename * ".bin"
@@ -29,13 +50,10 @@ function RenyiNegativity(filename::String, filedir::String=pwd();
 
     # 使用 readdlm 读取整个文件
     data = readdlm(filepath, Float64)
-    # Apply start and end bin selection
-    data = data[startbin:end,:]
-    if !isnothing(endbin)
-        data = data[1:endbin,:]
-    end
-    # remove the max and min
-    data = filter(data, dropmaxmin)
+    nbin = size(data, 1)
+    start_idx = max(startbin, 1)
+    end_idx = isnothing(endbin) ? nbin : min(endbin, nbin)
+    data = data[start_idx:end_idx, :]
 
     # deduce L and rank from the data
     L = size(data,2) ÷ 2 - 1
@@ -48,6 +66,7 @@ function RenyiNegativity(filename::String, filedir::String=pwd();
     RenyiN = zeros(L+1,2)
     for i in 1:L+1
         vectmp = data[:,2i-1] # take real part
+        vectmp = remove_outliers(vectmp, outlier_mode, outlier_param; min_n=5)
         if mean(vectmp) > 0.0
             mn = mean(vectmp)
 
@@ -103,26 +122,28 @@ end
 
 """
     EnergyAnalysis(filename="energy.bin", filedir=pwd();
-                   startbin=2, endbin=nothing, dropmaxmin=0,
-                   columns=[5,7,9,11], labels=["E_kin", "E_pot", "E_tot", "E_tot^2"],
+                   startbin=2, endbin=nothing, outlier_mode=:dropmaxmin, outlier_param=0,
+                   columns=[5,7,9], labels=["E_kin", "d_occ", "E_tot"],
                    verbose=true)
 
 Analyze energy.bin file and calculate Monte Carlo averages and errors for specified columns.
 
-Arguments:
+# Arguments
 - `filename`: Name of the energy file (default: "energy.bin")
 - `filedir`: Directory containing the file (default: current directory)
 - `startbin`: First bin to include in analysis (default: 2)
-- `endbin`: Last bin to include in analysis (default: all bins)
-- `dropmaxmin`: Number of maximum and minimum values to drop (default: 0)
-- `columns`: Array of column indices to analyze (default: [5,7,9,11])
-- `labels`: Array of labels for the columns (default: ["E_kin", "E_pot", "E_tot", "E_tot^2"])
+- `endbin`: Last bin to include in analysis, inclusive (default: all bins)
+- `outlier_mode`: `:dropmaxmin` (trim extremes) or `:iqrfence` (Tukey IQR fence).
+- `outlier_param`: For `:dropmaxmin`, number of max/min values to trim (integer, default 0).
+                  For `:iqrfence`, positive Real k multiplier for IQR.
+- `columns`: Array of column indices to analyze (default: [5,7,9])
+- `labels`: Array of labels for the columns (default: ["E_kin", "d_occ", "E_tot"])
 - `verbose`: Whether to print results to console (default: true)
 
-Returns:
+# Returns
 - Dictionary with column labels as keys and [mean, error] arrays as values
 
-Example:
+# Example
 ```julia
 # Analyze energy.bin in current directory
 results = EnergyAnalysis()
@@ -130,13 +151,17 @@ results = EnergyAnalysis()
 # Analyze specific columns with custom labels
 results = EnergyAnalysis(columns=[5,7], labels=["Kinetic", "Potential"])
 
+# Use IQR fence instead of trim
+results = EnergyAnalysis(outlier_mode=:iqrfence, outlier_param=10.0)
+
 # Access results
 kinetic_energy = results["Kinetic"][1]  # mean value
 kinetic_error = results["Kinetic"][2]   # error
 ```
 """
 function EnergyAnalysis(filename::String="energy.bin", filedir::String=pwd();
-                       startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
+                       startbin::Int=2, endbin::Union{Int,Nothing}=nothing,
+                       outlier_mode::Symbol=:dropmaxmin, outlier_param::Real=0,
                        columns::Vector{Int}=[5,7,9],
                        labels::Vector{String}=["E_kin", "d_occ", "E_tot"],
                        verbose::Bool=true)
@@ -158,20 +183,17 @@ function EnergyAnalysis(filename::String="energy.bin", filedir::String=pwd();
 
     # Read data
     data = readdlm(filepath, Float64)
+    nbin = size(data, 1)
 
     # Check if file has enough columns
     if size(data, 2) < maximum(columns)
         error("File has only $(size(data, 2)) columns, but analysis requested column $(maximum(columns))")
     end
 
-    # Apply start and end bin selection
-    data = data[startbin:end,:]
-    if !isnothing(endbin)
-        data = data[1:endbin,:]
-    end
-
-    # Remove the max and min values
-    data = filter(data, dropmaxmin)
+    # Apply start and end bin selection (inclusive bin indices)
+    start_idx = max(startbin, 1)
+    end_idx = isnothing(endbin) ? nbin : min(endbin, nbin)
+    data = data[start_idx:end_idx, :]
 
     # Calculate statistics for each column
     results = Dict{String, Vector{Float64}}()
@@ -186,6 +208,8 @@ function EnergyAnalysis(filename::String="energy.bin", filedir::String=pwd();
     for (i, col) in enumerate(columns)
         label = labels[i]
         values = data[:, col]
+        # Apply outlier removal via unified interface
+        values = remove_outliers(values, outlier_mode, outlier_param; min_n=5)
 
         # Calculate mean and error
         mean_val = mean(values)
