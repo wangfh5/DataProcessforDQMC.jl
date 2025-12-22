@@ -38,11 +38,12 @@ result_AA = StructureFactorAnalysis(
     real_column=3,        # AA orbital real part (column 3)
     imag_column=4,        # AA orbital imag part (column 4)
     startbin=2,           # skip first bin
-    dropmaxmin=0,         # don't drop outliers
+    outlier_mode=:dropmaxmin,
+    outlier_param=0,      # 0 => no trimming
     verbose=true          # print detailed results
 )
 
-println("Result: G_AA(Γ) = $(result_AA.formatted_real)")
+println("Result: G_AA(Γ) = $(result_AA.formatted_real)") # should be 5e-01 ± 0e-1
 
 # Example 1.2: Analyze cpcm_k.bin, AB orbital (columns 5, 6) at different k-point
 println("\n--- Example 1.2: cpcm_k.bin at (π,π) point, AB orbital ---")
@@ -50,15 +51,16 @@ result_AB = StructureFactorAnalysis(
     (0.5, 0.5),               # k-point: (π,π) point
     "cpcm_k.bin",
     example_dir;
-    real_column=5,        # AB orbital real part (column 5)
-    imag_column=6,        # AB orbital imag part (column 6)
+    real_column=7,        # AB orbital real part (column 7)
+    imag_column=8,        # AB orbital imag part (column 8)
     startbin=2,
-    dropmaxmin=0,
+    outlier_mode=:dropmaxmin,
+    outlier_param=0,
     k_point_tolerance=1e-6,  # tolerance for k-point matching
     verbose=true
 )
 
-println("Result: G_AB(π,π) = $(result_AB.formatted_real)")
+println("Result: G_AB(π,π) = $(result_AB.formatted_real)") # should be -4.005e-01 ± 0.002e-1
 
 # Example 1.3: Analyze nn_k.bin (density-density correlator), BB orbital
 println("\n--- Example 1.3: nn_k.bin at Γ point, BB orbital ---")
@@ -69,11 +71,14 @@ result_nn_BB = StructureFactorAnalysis(
     real_column=9,        # BB orbital real part (column 9)
     imag_column=10,       # BB orbital imag part (column 10)
     startbin=2,
-    dropmaxmin=0,
+    outlier_mode=:iqrfence,
+    outlier_param=1.5,
+    # outlier_mode=:dropmaxmin,
+    # outlier_param=1,
     verbose=true
 )
 
-println("Result: N_BB(Γ) = $(result_nn_BB.formatted_real)")
+println("Result: N_BB(Γ) = $(result_nn_BB.formatted_real)") # should be 2.9e-01 ± 0.3e-1
 
 # Example 1.4: Analyze cpcm_r.bin (real-space Green's function), AB orbital
 # Note: The framework treats (imj_x, imj_y) coordinates just like (kx, ky)
@@ -85,12 +90,13 @@ result_r_AB = StructureFactorAnalysis(
     real_column=7,        # AB orbital real part (column 7 in cpcm_r.bin)
     imag_column=8,        # AB orbital imag part (column 8)
     startbin=2,
-    dropmaxmin=0,
+    outlier_mode=:dropmaxmin,
+    outlier_param=0,
     k_point_tolerance=1e-6,  # For r-space integer coordinates, this ensures exact match
     verbose=true
 )
 
-println("Result: G_AB(r=(1,1)) = $(result_r_AB.formatted_real)")
+println("Result: G_AB(r=(1,1)) = $(result_r_AB.formatted_real)") # should be -3.939e+01 ± 0.003e1
 
 # ============================================================================ #
 #                    Part 2: Multi-Directory Batch Analysis                    #
@@ -117,7 +123,7 @@ df_AB = analyze_structure_factor_multi_parameter(
             dir;
             real_column=7,     # Fix: AB orbital real part
             imag_column=8,     # Fix: AB orbital imag part
-            kwargs...          # Auto-inherit: startbin, dropmaxmin, etc.
+            kwargs...          # Auto-inherit: startbin, outlier_mode/outlier_param, etc.
         ),
     (0.0, 0.0),            # Γ point
     base_dir;              # Base directory to scan
@@ -126,7 +132,8 @@ df_AB = analyze_structure_factor_multi_parameter(
     result_columns=[:mean_real, :err_real, :mean_imag, :err_imag],
     result_prefix="G_AB",
     startbin=2,
-    dropmaxmin=0,
+    outlier_mode=:dropmaxmin,
+    outlier_param=0,
     verbose=true,
     filter_options=(prefix="proj_bt_honeycomb_exact", U=4.0)
 )
@@ -145,7 +152,7 @@ df_nn_AA = analyze_structure_factor_multi_parameter(
             dir;
             real_column=3,     # Fix: AA orbital real part
             imag_column=4,     # Fix: AA orbital imag part
-            kwargs...          # Auto-inherit: startbin, dropmaxmin, etc.
+            kwargs...          # Auto-inherit: startbin, outlier_mode/outlier_param, etc.
         ),
     (0.5, 0.5),            # (π,π) point
     base_dir;
@@ -154,7 +161,8 @@ df_nn_AA = analyze_structure_factor_multi_parameter(
     result_columns=[:mean_real, :err_real, :mean_imag, :err_imag],
     result_prefix="N_AA",
     startbin=2,
-    dropmaxmin=0,
+    outlier_mode=:dropmaxmin,
+    outlier_param=0,
     verbose=true,
     filter_options=(prefix="proj_bt_honeycomb_exact", U=4.0)
 )
@@ -176,7 +184,7 @@ df_r_AB = analyze_structure_factor_multi_parameter(
             dir;
             real_column=7,     # Fix: AB orbital real part in cpcm_r.bin
             imag_column=8,     # Fix: AB orbital imag part in cpcm_r.bin
-            kwargs...          # Auto-inherit: startbin, dropmaxmin, etc.
+            kwargs...          # Auto-inherit: startbin, outlier_mode/outlier_param, etc.
         ),
     (12, 12),              # r-point to analyze (unit cell coordinates)
     base_dir;              # Base directory to scan
@@ -185,7 +193,8 @@ df_r_AB = analyze_structure_factor_multi_parameter(
     result_columns=[:mean_real, :err_real, :mean_imag, :err_imag],
     result_prefix="G_AB_r",
     startbin=2,
-    dropmaxmin=0,
+    outlier_mode=:dropmaxmin,
+    outlier_param=0,
     verbose=true,
     filter_options=(prefix="proj_bt_honeycomb_exact", L=24)
 )

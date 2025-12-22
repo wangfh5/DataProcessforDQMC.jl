@@ -19,7 +19,7 @@ export RenyiNegativity, RenyiNegativity_all
 
 """
     RenyiNegativity(filename, filedir=pwd(); printLA=nothing, startbin=3, endbin=nothing,
-                    outlier_mode=:dropmaxmin, outlier_param=1)
+                    outlier_mode=:dropmaxmin, outlier_param=1, verbose=true)
 
 Calculate Renyi negativity from expRenyiN*.bin files.
 
@@ -32,13 +32,14 @@ Calculate Renyi negativity from expRenyiN*.bin files.
 - `outlier_mode`: `:dropmaxmin` (trim extremes) or `:iqrfence` (Tukey IQR fence).
 - `outlier_param`: For `:dropmaxmin`, number of max/min values to trim (integer, default 1).
                   For `:iqrfence`, positive Real k multiplier for IQR.
+- `verbose`: When `true`, prints IQR fence outlier summary per LA (only for `:iqrfence`).
 
 # Returns
 - `(expRenyiN, RenyiN)`: Arrays of shape (L+1, 2) with [mean, error] for each LA.
 """
 function RenyiNegativity(filename::String, filedir::String=pwd();
     printLA=nothing, startbin::Int=3, endbin::Union{Int,Nothing}=nothing,
-    outlier_mode::Symbol=:dropmaxmin, outlier_param::Real=1)
+    outlier_mode::Symbol=:dropmaxmin, outlier_param::Real=1, verbose::Bool=true)
 
     # Add .bin extension if not present
     if !endswith(filename, ".bin")
@@ -66,7 +67,14 @@ function RenyiNegativity(filename::String, filedir::String=pwd();
     RenyiN = zeros(L+1,2)
     for i in 1:L+1
         vectmp = data[:,2i-1] # take real part
-        vectmp = remove_outliers(vectmp, outlier_mode, outlier_param; min_n=5)
+        res = remove_outliers(vectmp, outlier_mode, outlier_param; min_n=5)
+        vectmp = res.values
+        if verbose && Symbol(outlier_mode) == :iqrfence
+            kept = length(vectmp)
+            total = length(vectmp) + res.removed_min + res.removed_max
+            println("outlier (iqrfence): removed_min=$(res.removed_min), removed_max=$(res.removed_max), kept=$(kept)/$(total) for LA=$(i-1)")
+        end
+
         if mean(vectmp) > 0.0
             mn = mean(vectmp)
 
@@ -208,8 +216,13 @@ function EnergyAnalysis(filename::String="energy.bin", filedir::String=pwd();
     for (i, col) in enumerate(columns)
         label = labels[i]
         values = data[:, col]
+        orig_len = length(values)
         # Apply outlier removal via unified interface
-        values = remove_outliers(values, outlier_mode, outlier_param; min_n=5)
+        res = remove_outliers(values, outlier_mode, outlier_param; min_n=5)
+        values = res.values
+        if verbose && Symbol(outlier_mode) == :iqrfence
+            println("outlier (iqrfence): removed_min=$(res.removed_min), removed_max=$(res.removed_max), kept=$(length(values))/$(orig_len) for $label")
+        end
 
         # Calculate mean and error
         mean_val = mean(values)

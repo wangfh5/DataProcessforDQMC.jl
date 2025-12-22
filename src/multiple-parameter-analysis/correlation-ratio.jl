@@ -20,7 +20,8 @@ export analyze_correlation_ratio_multi_parameter,
                                            force_rebuild::Bool=false,
                                            startbin::Int=2,
                                            endbin::Union{Int,Nothing}=nothing,
-                                           dropmaxmin::Int=0,
+                                           outlier_mode::Symbol=:dropmaxmin,
+                                           outlier_param::Real=0,
                                            auto_digits::Bool=true,
                                            k_point_tolerance::Float64=1e-6,
                                            verbose::Bool=false,
@@ -40,7 +41,8 @@ Generic multi-parameter correlation ratio analysis function, suitable for analyz
 - `force_rebuild::Bool`: Force rebuild structure factor file even if exists (default: false)
 - `startbin::Int`: Starting bin for analysis (default: 2)
 - `endbin::Union{Int,Nothing}`: Ending bin for analysis (default: all bins)
-- `dropmaxmin::Int`: Number of max/min values to drop (default: 0)
+- `outlier_mode::Symbol`: `:dropmaxmin` or `:iqrfence` (default: `:dropmaxmin`)
+- `outlier_param::Real`: parameter for the selected outlier mode (default: 0 = no filtering)
 - `auto_digits::Bool`: Whether to automatically determine significant digits (default: true)
 - `k_point_tolerance::Float64`: Tolerance for matching k-points (default: 1e-6)
 - `verbose::Bool`: Whether to output detailed information (default: false)
@@ -60,7 +62,8 @@ function analyze_correlation_ratio_multi_parameter(correlation_ratio_function::F
                                            force_rebuild::Bool=false,
                                            startbin::Int=2,
                                            endbin::Union{Int,Nothing}=nothing,
-                                           dropmaxmin::Int=0,
+                                           outlier_mode::Symbol=:dropmaxmin,
+                                           outlier_param::Real=0,
                                            auto_digits::Bool=true,
                                            k_point_tolerance::Float64=1e-6,
                                            verbose::Bool=false,
@@ -117,7 +120,8 @@ function analyze_correlation_ratio_multi_parameter(correlation_ratio_function::F
                 force_rebuild=force_rebuild,
                 startbin=startbin, 
                 endbin=endbin, 
-                dropmaxmin=dropmaxmin,
+                outlier_mode=outlier_mode,
+                outlier_param=outlier_param,
                 auto_digits=auto_digits, 
                 k_point_tolerance=k_point_tolerance, 
                 verbose=verbose
@@ -165,7 +169,8 @@ end
                                                force_rebuild::Bool=false,
                                                startbin::Int=2,
                                                endbin::Union{Int,Nothing}=nothing,
-                                               dropmaxmin::Int=0,
+                                               outlier_mode::Symbol=:dropmaxmin,
+                                               outlier_param::Real=0,
                                                auto_digits::Bool=true,
                                                k_point_tolerance::Float64=1e-6,
                                                verbose::Bool=false,
@@ -182,7 +187,8 @@ Analyze AFM correlation ratio across multiple parameter directories.
 - `force_rebuild::Bool`: Force rebuild structure factor file even if exists (default: false)
 - `startbin::Int`: Starting bin for analysis (default: 2)
 - `endbin::Union{Int,Nothing}`: Ending bin for analysis (default: all bins)
-- `dropmaxmin::Int`: Number of max/min values to drop (default: 0)
+- `outlier_mode::Symbol`: `:dropmaxmin` or `:iqrfence` (default: `:dropmaxmin`)
+- `outlier_param::Real`: parameter for the selected outlier mode (default: 0 = no filtering)
 - `auto_digits::Bool`: Whether to automatically determine significant digits (default: true)
 - `k_point_tolerance::Float64`: Tolerance for matching k-points (default: 1e-6)
 - `verbose::Bool`: Whether to output detailed information (default: false)
@@ -199,7 +205,8 @@ function analyze_AFM_correlation_ratio_multi_parameter(base_dir::AbstractString=
                                                force_rebuild::Bool=false,
                                                startbin::Int=2,
                                                endbin::Union{Int,Nothing}=nothing,
-                                               dropmaxmin::Int=0,
+                                               outlier_mode::Symbol=:dropmaxmin,
+                                               outlier_param::Real=0,
                                                auto_digits::Bool=true,
                                                k_point_tolerance::Float64=1e-6,
                                                verbose::Bool=false,
@@ -216,7 +223,8 @@ function analyze_AFM_correlation_ratio_multi_parameter(base_dir::AbstractString=
         force_rebuild=force_rebuild,
         startbin=startbin,
         endbin=endbin,
-        dropmaxmin=dropmaxmin,
+        outlier_mode=outlier_mode,
+        outlier_param=outlier_param,
         auto_digits=auto_digits,
         k_point_tolerance=k_point_tolerance,
         verbose=verbose,
@@ -233,7 +241,8 @@ end
                                                force_rebuild::Bool=false,
                                                startbin::Int=2,
                                                endbin::Union{Int,Nothing}=nothing,
-                                               dropmaxmin::Int=0,
+                                               outlier_mode::Symbol=:dropmaxmin,
+                                               outlier_param::Real=0,
                                                auto_digits::Bool=true,
                                                k_point_tolerance::Float64=1e-6,
                                                verbose::Bool=false,
@@ -251,7 +260,8 @@ Analyze CDW correlation ratio across multiple parameter directories.
 - `force_rebuild::Bool`: Force rebuild structure factor file even if exists (default: false)
 - `startbin::Int`: Starting bin for analysis (default: 2)
 - `endbin::Union{Int,Nothing}`: Ending bin for analysis (default: all bins)
-- `dropmaxmin::Int`: Number of max/min values to drop (default: 0)
+- `outlier_mode::Symbol`: `:dropmaxmin` or `:iqrfence` (default: `:dropmaxmin`)
+- `outlier_param::Real`: parameter for the selected outlier mode (default: 0 = no filtering)
 - `auto_digits::Bool`: Whether to automatically determine significant digits (default: true)
 - `k_point_tolerance::Float64`: Tolerance for matching k-points (default: 1e-6)
 - `verbose::Bool`: Whether to output detailed information (default: false)
@@ -268,7 +278,8 @@ function analyze_CDW_correlation_ratio_multi_parameter(base_dir::AbstractString=
                                                force_rebuild::Bool=false,
                                                startbin::Int=2,
                                                endbin::Union{Int,Nothing}=nothing,
-                                               dropmaxmin::Int=0,
+                                               outlier_mode::Symbol=:dropmaxmin,
+                                               outlier_param::Real=0,
                                                auto_digits::Bool=true,
                                                k_point_tolerance::Float64=1e-6,
                                                verbose::Bool=false,
@@ -285,7 +296,8 @@ function analyze_CDW_correlation_ratio_multi_parameter(base_dir::AbstractString=
         force_rebuild=force_rebuild,
         startbin=startbin,
         endbin=endbin,
-        dropmaxmin=dropmaxmin,
+        outlier_mode=outlier_mode,
+        outlier_param=outlier_param,
         auto_digits=auto_digits,
         k_point_tolerance=k_point_tolerance,
         verbose=verbose,

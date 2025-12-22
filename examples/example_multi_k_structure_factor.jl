@@ -42,7 +42,8 @@ results = StructureFactorAnalysis(
     real_column=5,        # AB orbital real part
     imag_column=6,        # AB orbital imag part
     startbin=2,
-    dropmaxmin=0,
+    outlier_mode=:dropmaxmin,
+    outlier_param=0,
     k_point_tolerance=1e-6,
     verbose=true
 )
@@ -81,7 +82,8 @@ df_multi_k = analyze_structure_factor_multi_parameter(
     result_columns=[:mean_real, :err_real, :mean_imag, :err_imag],
     result_prefix="G_AB",
     startbin=2,
-    dropmaxmin=0,
+    outlier_mode=:dropmaxmin,
+    outlier_param=0,
     verbose=true,
     filter_options=(prefix="proj_bt_honeycomb_exact",)
 )

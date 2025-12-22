@@ -22,7 +22,7 @@ export StructureFactorResult
 """
     StructureFactorResult
 
-结构因子分析结果的结构体。
+单个动量点处结构因子分析结果的结构体。
 
 # 字段
 - `k_point::Tuple{Float64, Float64}`: 实际使用的k点坐标
@@ -104,7 +104,8 @@ function _multi_k_structure_factor_analysis_core(
     filedir::String;
     startbin::Int=2,
     endbin::Union{Int,Nothing}=nothing,
-    dropmaxmin::Int=0,
+    outlier_mode::Symbol=:dropmaxmin,
+    outlier_param::Real=0,
     real_column::Int=3,
     imag_column::Int=4,
     auto_digits::Bool=true,
@@ -157,28 +158,38 @@ function _multi_k_structure_factor_analysis_core(
     
         # 提取该k点的数据
         k_data = data_array[k_indices, :]
-        
-            # 创建DataFrame
-        k_df = DataFrame(
-                :kx => k_data[:, 1],
-                :ky => k_data[:, 2],
-                    :bin => 1:length(k_indices),
-                    :real => k_data[:, real_column],
-                    :imag => k_data[:, imag_column]
-                )
-        
-        # 应用bin筛选
+
+        # 选择 bin 范围
         n_bins = length(k_indices)
-        filtered_k_df = filter_bins(k_df, startbin, endbin, dropmaxmin, n_bins, false,
-                                    value_columns=[:real, :imag])
-        
-        if isempty(filtered_k_df)
-            @warn "No data found for k-point $closest_k after filtering, skipping..."
+        start_idx = max(startbin, 1)
+        end_idx = isnothing(endbin) ? n_bins : min(endbin, n_bins)
+        if start_idx > end_idx
+            @warn "Invalid bin range startbin=$startbin endbin=$endbin for k-point $closest_k, skipping..."
             continue
         end
-        
+
+        real_vals = k_data[start_idx:end_idx, real_column]
+        imag_vals = k_data[start_idx:end_idx, imag_column]
+
+        # 生成离群 mask（metric = abs(real + i*imag)）
+        metric = abs.(complex.(real_vals, imag_vals))
+
+        mask = outlier_filter(metric, outlier_mode, outlier_param; min_n=5)
+        keep = mask.keep
+
+        if verbose && outlier_mode == :iqrfence
+            kept = count(keep)
+            total = length(metric)
+            println("IQR fence outlier summary: removed_min=$(mask.removed_min), removed_max=$(mask.removed_max), kept=$(kept)/$(total)")
+        end
+
+        if !any(keep)
+            @warn "No finite data found for k-point $closest_k after outlier filtering, skipping..."
+            continue
+        end
+
         # 计算统计量
-        stats = compute_stats(filtered_k_df.real, filtered_k_df.imag, auto_digits=auto_digits)
+        stats = compute_stats(real_vals[keep], imag_vals[keep], auto_digits=auto_digits)
         
         # 创建结果结构体
         push!(results, StructureFactorResult(
@@ -202,7 +213,8 @@ end
 """
     StructureFactorAnalysis(k_points::Vector{<:Tuple{<:Real,<:Real}}, 
                            filename::String="spsm_k.bin", filedir::String=pwd();
-                           startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
+                           startbin::Int=2, endbin::Union{Int,Nothing}=nothing,
+                           outlier_mode::Symbol=:dropmaxmin, outlier_param::Real=0,
                            real_column::Int=3, imag_column::Int=4,
                            auto_digits::Bool=true, k_point_tolerance::Float64=1e-6, 
                            verbose::Bool=true) -> Vector{StructureFactorResult}
@@ -215,7 +227,8 @@ end
 - `filedir`: 文件目录 (默认: 当前目录)
 - `startbin`: 起始bin (默认: 2)
 - `endbin`: 结束bin (默认: 所有bin)
-- `dropmaxmin`: 丢弃的最大最小值数量 (默认: 0)
+- `outlier_mode`: `:dropmaxmin` 或 `:iqrfence`（默认 `:dropmaxmin`）
+- `outlier_param`: 对应模式的参数（默认 0，表示不做离群过滤）
 - `real_column`: 实部列索引 (默认: 3)
 - `imag_column`: 虚部列索引 (默认: 4)
 - `auto_digits`: 是否自动确定有效数字 (默认: true)
@@ -241,7 +254,8 @@ function StructureFactorAnalysis(
     filedir::String=pwd();
     startbin::Int=2,
     endbin::Union{Int,Nothing}=nothing,
-    dropmaxmin::Int=0,
+    outlier_mode::Symbol=:dropmaxmin,
+    outlier_param::Real=0,
     real_column::Int=3,
     imag_column::Int=4,
     auto_digits::Bool=true,
@@ -254,7 +268,8 @@ function StructureFactorAnalysis(
     # 调用核心实现
     results = _multi_k_structure_factor_analysis_core(
         k_points_converted, filename, filedir;
-        startbin=startbin, endbin=endbin, dropmaxmin=dropmaxmin,
+        startbin=startbin, endbin=endbin,
+        outlier_mode=outlier_mode, outlier_param=outlier_param,
         real_column=real_column, imag_column=imag_column,
         auto_digits=auto_digits, k_point_tolerance=k_point_tolerance, verbose=verbose
     )
@@ -272,7 +287,8 @@ end
 """
     StructureFactorAnalysis(k_point::Tuple{<:Real,<:Real}, 
                            filename::String="spsm_k.bin", filedir::String=pwd();
-                           startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
+                           startbin::Int=2, endbin::Union{Int,Nothing}=nothing,
+                           outlier_mode::Symbol=:dropmaxmin, outlier_param::Real=0,
                            real_column::Int=3, imag_column::Int=4,
                            auto_digits::Bool=true, k_point_tolerance::Float64=1e-6, 
                            verbose::Bool=true) -> StructureFactorResult
@@ -300,7 +316,8 @@ function StructureFactorAnalysis(
     filedir::String=pwd();
     startbin::Int=2,
     endbin::Union{Int,Nothing}=nothing,
-    dropmaxmin::Int=0,
+    outlier_mode::Symbol=:dropmaxmin,
+    outlier_param::Real=0,
     real_column::Int=3,
     imag_column::Int=4,
     auto_digits::Bool=true,
@@ -310,7 +327,8 @@ function StructureFactorAnalysis(
     # 调用多k点版本
     results = StructureFactorAnalysis(
         [k_point], filename, filedir;
-        startbin=startbin, endbin=endbin, dropmaxmin=dropmaxmin,
+        startbin=startbin, endbin=endbin,
+        outlier_mode=outlier_mode, outlier_param=outlier_param,
         real_column=real_column, imag_column=imag_column,
         auto_digits=auto_digits, k_point_tolerance=k_point_tolerance, verbose=verbose
     )
@@ -331,7 +349,8 @@ end
     AFMStructureFactor(k_point::Tuple{<:Real,<:Real}=(0.0, 0.0), 
                       filename::String="afm_sf_k.bin", filedir::String=pwd();
                       force_rebuild::Bool=false, source_file::String="spsm_k.bin", 
-                      startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
+                      startbin::Int=2, endbin::Union{Int,Nothing}=nothing,
+                      outlier_mode::Symbol=:dropmaxmin, outlier_param::Real=0,
                       auto_digits::Bool=true, k_point_tolerance::Float64=1e-6, verbose::Bool=true) -> StructureFactorResult
 
 Calculate antiferromagnetic structure factor S_AF(L) = [spsm_k(0,A,A) + spsm_k(0,B,B) - spsm_k(0,A,B) - spsm_k(0,B,A)].
@@ -348,7 +367,8 @@ The function can use either:
 - `source_file`: Source file to generate structure factor if needed (default: "spsm_k.bin")
 - `startbin`: Starting bin for statistics (default: 2)
 - `endbin`: Ending bin for statistics (default: all bins)
-- `dropmaxmin`: Number of max/min values to drop (default: 0)
+- `outlier_mode`: `:dropmaxmin` or `:iqrfence` (default: `:dropmaxmin`)
+- `outlier_param`: parameter for the selected outlier mode (default: 0, meaning no trimming/fence)
 - `auto_digits`: Whether to automatically determine significant digits (default: true)
 - `k_point_tolerance`: Tolerance for k-point matching (default: 1e-6)
 - `verbose`: Whether to output detailed information (default: true)
@@ -376,7 +396,8 @@ function AFMStructureFactor(
     source_file::String="spsm_k.bin",
     startbin::Int=2,
     endbin::Union{Int,Nothing}=nothing,
-    dropmaxmin::Int=0,
+    outlier_mode::Symbol=:dropmaxmin,
+    outlier_param::Real=0,
     auto_digits::Bool=true,
     k_point_tolerance::Float64=1e-6,
     verbose::Bool=true
@@ -418,7 +439,8 @@ function AFMStructureFactor(
         filedir;
         startbin=startbin,
         endbin=endbin,
-        dropmaxmin=dropmaxmin,
+        outlier_mode=outlier_mode,
+        outlier_param=outlier_param,
         auto_digits=auto_digits,
         k_point_tolerance=k_point_tolerance,
         verbose=verbose
@@ -431,7 +453,8 @@ end
     CDWStructureFactor(k_point::Tuple{<:Real,<:Real}=(0.0, 0.0), 
                       filename::String="cdwpair_sf_k.bin", filedir::String=pwd();
                       force_rebuild::Bool=false, source_file::String="cdwpair_k.bin", 
-                      startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
+                      startbin::Int=2, endbin::Union{Int,Nothing}=nothing,
+                      outlier_mode::Symbol=:dropmaxmin, outlier_param::Real=0,
                       auto_digits::Bool=true, k_point_tolerance::Float64=1e-6, verbose::Bool=true) -> StructureFactorResult
 
 Calculate charge density wave structure factor S_CDW(L) = [cdwpair_k(0,A,A) + cdwpair_k(0,B,B) + cdwpair_k(0,A,B) + cdwpair_k(0,B,A)].
@@ -448,7 +471,8 @@ The function can use either:
 - `source_file`: Source file to generate structure factor if needed (default: "cdwpair_k.bin")
 - `startbin`: Starting bin for statistics (default: 2)
 - `endbin`: Ending bin for statistics (default: all bins)
-- `dropmaxmin`: Number of max/min values to drop (default: 0)
+- `outlier_mode`: `:dropmaxmin` or `:iqrfence` (default: `:dropmaxmin`)
+- `outlier_param`: parameter for the selected outlier mode (default: 0, meaning no trimming/fence)
 - `auto_digits`: Whether to automatically determine significant digits (default: true)
 - `k_point_tolerance`: Tolerance for k-point matching (default: 1e-6)
 - `verbose`: Whether to output detailed information (default: true)
@@ -476,7 +500,8 @@ function CDWStructureFactor(
     source_file::String="cdwpair_k.bin",
     startbin::Int=2,
     endbin::Union{Int,Nothing}=nothing,
-    dropmaxmin::Int=0,
+    outlier_mode::Symbol=:dropmaxmin,
+    outlier_param::Real=0,
     auto_digits::Bool=true,
     k_point_tolerance::Float64=1e-6,
     verbose::Bool=true
@@ -518,7 +543,8 @@ function CDWStructureFactor(
         filedir;
         startbin=startbin,
         endbin=endbin,
-        dropmaxmin=dropmaxmin,
+        outlier_mode=outlier_mode,
+        outlier_param=outlier_param,
         auto_digits=auto_digits,
         k_point_tolerance=k_point_tolerance,
         verbose=verbose

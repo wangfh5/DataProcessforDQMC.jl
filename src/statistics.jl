@@ -3,10 +3,10 @@ using DataFrames
 using Printf
 
 export error, round_error, format_value_error
-export iqr_fence_filter, remove_outliers
+export iqr_fence_filter, outlier_filter, remove_outliers
 
 ## -------------------------------------------------------------------------- ##
-##                                   Filters                                  ##
+##                              Outlier filtering                             ##
 ## -------------------------------------------------------------------------- ##
 
 """
@@ -14,101 +14,119 @@ export iqr_fence_filter, remove_outliers
 
 Apply Tukey's IQR fence to remove extreme outliers.
 
-Given samples `x₁,…,xₙ`, define the quartiles:
-
-    Q₁ = quantile(x, 0.25),   Q₃ = quantile(x, 0.75),   IQR = Q₃ − Q₁
-
-and the Tukey fences:
-
-    L = Q₁ − k·IQR,    U = Q₃ + k·IQR
-
-We keep `S = { xᵢ | L ≤ xᵢ ≤ U }` and treat the rest as outliers.
-
-This function is designed for situations where **a tiny number of extreme algorithmic outliers**
-(e.g. pathological bootstrap fits) can destroy plain mean/std.
+Given samples `x₁,…,xₙ`, define the quartiles and fences; keep points in-range.
 
 # Behaviour / edge cases
-- Non-finite values (`NaN`, `Inf`) and `missing` are ignored before computing quantiles.
-- If the number of finite samples is `< min_n`, no fence is applied (returns input finite values).
-- If `IQR == 0` or non-finite, no fence is applied.
-- If the fence would remove all samples, we fall back to the original finite values.
+- Ignore `missing` / non-finite before quantiles.
+- If finite samples `< min_n`, or `IQR <= 0`, keep all finite.
+- If fence would remove all, fall back to keeping all finite.
 
 # Returns
-`(filtered_values::Vector{Float64}, n_removed::Int)`
-
-where `n_removed` counts only the number of values removed by the fence (not NaN/Inf/missing).
-
-# Parameters
-- `k`: fence multiplier. Typical boxplot values: 1.5 (mild) or 3 (extreme).
-       Use large `k` (e.g. 10) if you only want to remove **very extreme** outliers.
-- `min_n`: minimum number of samples required to apply the fence. Defaults to 5.
+`(; keep::BitVector, filtered::Vector{Float64}, removed_min::Int, removed_max::Int)`
 """
 function iqr_fence_filter(values; k::Real=10.0, min_n::Int=5)
-    # Collect finite numeric values; ignore missing/NaN/Inf.
-    vals = Float64[]
-    for v in values
-        if ismissing(v)
-            continue
-        end
-        x = Float64(v)
-        isfinite(x) || continue
-        push!(vals, x)
+    keep = falses(length(values))
+    finite_idx = findall(x -> !ismissing(x) && isfinite(x), values)
+    n_finite = length(finite_idx)
+    removed_min = 0
+    removed_max = 0
+
+    if n_finite < min_n
+        keep[finite_idx] .= true
+        return (; keep, filtered=values[keep], removed_min, removed_max)
     end
 
-    n = length(vals)
-    if n < min_n
-        return vals, 0
-    end
-
+    vals = Float64.(values[finite_idx])
     q1 = quantile(vals, 0.25)
     q3 = quantile(vals, 0.75)
     iqr = q3 - q1
     if !(isfinite(iqr) && iqr > 0)
-        return vals, 0
+        keep[finite_idx] .= true
+        return (; keep, filtered=values[keep], removed_min, removed_max)
     end
 
-    lo = q1 - Float64(k) * iqr
-    hi = q3 + Float64(k) * iqr
+    kk = Float64(k)
+    kk <= 0 && throw(ArgumentError("iqrfence k must be > 0, got $kk"))
+    lo = q1 - kk * iqr
+    hi = q3 + kk * iqr
 
-    filtered = [x for x in vals if lo <= x <= hi]
-    if isempty(filtered)
-        return vals, 0
+    kept_any = false
+    for (local_idx, global_idx) in enumerate(finite_idx)
+        v = vals[local_idx]
+        if lo <= v <= hi
+            keep[global_idx] = true
+            kept_any = true
+        else
+            if v < lo
+                removed_min += 1
+            elseif v > hi
+                removed_max += 1
+            end
+        end
     end
-    return filtered, n - length(filtered)
+
+    if !kept_any
+        keep[finite_idx] .= true
+        removed_min = 0
+        removed_max = 0
+    end
+
+    return (; keep, filtered=values[keep], removed_min, removed_max)
+end
+
+"""
+    outlier_filter(values, mode, param; min_n=5)
+
+统一的离群值处理入口（公开）。返回 keep mask 与筛选后的值，并附带删除计数。
+"""
+function outlier_filter(values::AbstractVector, mode, param; min_n::Int=5)
+    m = Symbol(lowercase(String(mode)))
+    if m == :dropmaxmin
+        dropnum = Int(param)
+        dropnum < 0 && throw(ArgumentError("dropmaxmin must be >= 0, got $dropnum"))
+    elseif m == :iqrfence
+        k = Float64(param)
+        k <= 0 && throw(ArgumentError("iqrfence k must be > 0, got $k"))
+    else
+        throw(ArgumentError("mode must be :dropmaxmin or :iqrfence, got $mode"))
+    end
+
+    keep = falses(length(values))
+    finite_idx = findall(x -> !ismissing(x) && isfinite(x), values)
+    n_finite = length(finite_idx)
+
+    if n_finite < min_n
+        keep[finite_idx] .= true
+        return (; keep, filtered=values[keep], removed_min=0, removed_max=0)
+    end
+
+    if m == :dropmaxmin
+        dropnum = Int(param)
+        if n_finite <= 2 * dropnum
+            keep[finite_idx] .= true
+            return (; keep, filtered=values[keep], removed_min=0, removed_max=0)
+        end
+        vals = Float64.(values[finite_idx])
+        order = sortperm(vals)
+        drop_set = Set(finite_idx[order[1:dropnum]] ∪ finite_idx[order[(end - dropnum + 1):end]])
+        for idx in finite_idx
+            idx ∈ drop_set && continue
+            keep[idx] = true
+        end
+        return (; keep, filtered=values[keep], removed_min=dropnum, removed_max=dropnum)
+    elseif m == :iqrfence
+        return iqr_fence_filter(values; k=param, min_n)
+    end
 end
 
 """
     remove_outliers(values, mode, param; min_n=5)
 
-统一的离群值处理入口。
-
-- `mode` 可用 `:dropmaxmin` / `"dropmaxmin"` 或 `:iqrfence` / `"iqrfence"`.
-- `param` 含义：
-    - dropmaxmin 模式：整数，表示要去掉的 max/min 个数
-    - iqrfence 模式：正实数，Tukey IQR fence 的倍数 k
-- `min_n`：样本少于该值时不做过滤（默认 5）。
-
-返回过滤后的向量；原始顺序会被破坏（与旧的 trim 行为一致）。
+统一的离群值处理入口（返回筛选后数据 + 删除计数）。
 """
 function remove_outliers(values::AbstractVector, mode, param; min_n::Int=5)
-    m = Symbol(lowercase(String(mode)))
-    if m == :dropmaxmin
-        dropnum = Int(param)
-        dropnum < 0 && throw(ArgumentError("dropmaxmin must be >= 0, got $dropnum"))
-        n = length(values)
-        if n < min_n || n <= 2 * dropnum
-            return collect(values)
-        end
-        sorted_vals = sort(collect(values))
-        return sorted_vals[(dropnum + 1):(n - dropnum)]
-    elseif m == :iqrfence
-        k = Float64(param)
-        k <= 0 && throw(ArgumentError("iqrfence k must be > 0, got $k"))
-        filtered, _ = iqr_fence_filter(values; k=k, min_n=min_n)
-        return filtered
-    else
-        throw(ArgumentError("mode must be :dropmaxmin or :iqrfence, got $mode"))
-    end
+    res = outlier_filter(values, mode, param; min_n)
+    return (; values=res.filtered, removed_min=res.removed_min, removed_max=res.removed_max)
 end
 
 ## -------------------------------------------------------------------------- ##
@@ -244,36 +262,49 @@ format_value_error(2367.38, 23; format=:decimal)         # ("2370", "30")
 ```
 """
 function format_value_error(value::Number, error::Number, error_sig_digits::Int=1; format::Symbol=:scientific)
-    # Step 1: Determine the digits of the error based on its significant digits and error
-    if error == 0.0
-        # Handle the case where error is exactly zero
-        rounded_error = 0.0
-        error_order = 0
-        error_digits = error_sig_digits - 1
-    else
-        # Round the error first, then derive its order; this keeps value precision in sync
-        rounded_error = round(error, RoundUp, sigdigits=error_sig_digits)
-        # For non-zero errors, calculate order of magnitude (err = x.x × 10^error_order)
-        # For example
-        # - If error = 23456, error_order = 4;
-        # - If error = 2.3456, error_order = 0;
-        # - If error = 0.00943, error_sig_digits = 2, rounded_error = 0.0095, error_order = -3;
-        # - If error = 0.00943, error_sig_digits = 1, rounded_error = 0.01, error_order = -2;
-        error_order = floor(log10(abs(rounded_error)))
-        # Check if error_order is -Inf (can happen with very small numbers due to floating point precision)
-        if isinf(error_order)
-            # Use the smallest representable order for very small numbers
-            error_order = -324  # Approximately the smallest exponent for Float64
+    @assert format in [:scientific, :decimal] "format must be :scientific or :decimal, got $format"
+    # Step 0: Special-case zero error.
+    if iszero(error)
+        if format == :scientific
+            x = Float64(value)
+            raw = @sprintf("%.15e", x)
+            mantissa, exp_str = split(raw, 'e')
+            exponent = parse(Int, exp_str)
+            if occursin('.', mantissa)
+                mantissa = replace(mantissa, r"0+$" => "")
+                mantissa = replace(mantissa, r"\.$" => "")
+            end
+            val_str = mantissa * "e" * exp_str
+            err_str = "0e$(exponent)"
+            return val_str, err_str
+        elseif format == :decimal
+            return string(value), "0"
         end
-        # For example
-        # - If error = 23456, error_sig_digits = 1, error_digits = - 4;
-        # - If error = 23456, error_sig_digits = 2, error_digits = - 4 + 2 - 1 = - 3;
-        # - If error = 2.3456, error_sig_digits = 1, error_digits = 0;
-        # - If error = 2.3456, error_sig_digits = 3, error_digits = 0 + 3 - 1 = 2;
-        # - If error = 0.00943, error_sig_digits = 2, error_digits = 3 + 2 - 1 = 4;
-        # - If error = 0.00943, error_sig_digits = 1, error_digits = 2 + 1 - 1 = 2;
-        error_digits = - Int(error_order - error_sig_digits + 1)
     end
+
+    # Step 1: Determine the digits of the error based on its significant digits and error
+    # Round the error first, then derive its order; this keeps value precision in sync
+    rounded_error = round(error, RoundUp, sigdigits=error_sig_digits)
+    # For non-zero errors, calculate order of magnitude (err = x.x × 10^error_order)
+    # For example
+    # - If error = 23456, error_order = 4;
+    # - If error = 2.3456, error_order = 0;
+    # - If error = 0.00943, error_sig_digits = 2, rounded_error = 0.0095, error_order = -3;
+    # - If error = 0.00943, error_sig_digits = 1, rounded_error = 0.01, error_order = -2;
+    error_order = floor(log10(abs(rounded_error)))
+    # Check if error_order is -Inf (can happen with very small numbers due to floating point precision)
+    if isinf(error_order)
+        # Use the smallest representable order for very small numbers
+        error_order = -324  # Approximately the smallest exponent for Float64
+    end
+    # For example
+    # - If error = 23456, error_sig_digits = 1, error_digits = - 4;
+    # - If error = 23456, error_sig_digits = 2, error_digits = - 4 + 2 - 1 = - 3;
+    # - If error = 2.3456, error_sig_digits = 1, error_digits = 0;
+    # - If error = 2.3456, error_sig_digits = 3, error_digits = 0 + 3 - 1 = 2;
+    # - If error = 0.00943, error_sig_digits = 2, error_digits = 3 + 2 - 1 = 4;
+    # - If error = 0.00943, error_sig_digits = 1, error_digits = 2 + 1 - 1 = 2;
+    error_digits = - Int(error_order - error_sig_digits + 1)
 
     # Step 2: Round the value to match the precision of the error
     value_digits = error_digits
@@ -330,8 +361,6 @@ function format_value_error(value::Number, error::Number, error_sig_digits::Int=
 
         val_str = @sprintf("%.*f", value_decimal_digits, rounded_val)
         err_str = @sprintf("%.*f", error_decimal_digits, rounded_error)
-    else
-        throw(ArgumentError("format must be :scientific or :decimal, got $format"))
     end
 
     return val_str, err_str

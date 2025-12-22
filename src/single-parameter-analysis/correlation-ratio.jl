@@ -15,7 +15,8 @@ export AFMCorrelationRatio, CDWCorrelationRatio
 """    
     AFMCorrelationRatio(shift_point::Tuple{<:Real,<:Real}, Q_point::Tuple{<:Real,<:Real}=(0.0, 0.0),
                      filename::String="afm_sf_k.bin", source_file::String="spsm_k.bin", filedir::String=pwd();
-                     force_rebuild::Bool=false, startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
+                     force_rebuild::Bool=false, startbin::Int=2, endbin::Union{Int,Nothing}=nothing,
+                     outlier_mode::Symbol=:dropmaxmin, outlier_param::Real=0,
                      orbital_columns::Vector{Tuple{Int,Int}}=[(3,4), (5,6), (7,8), (9,10)],
                      orbital_labels::Vector{String}=["AA", "BA", "AB", "BB"],
                      auto_digits::Bool=true, k_point_tolerance::Float64=1e-6, verbose::Bool=true)
@@ -35,7 +36,8 @@ where δq is a small shift in reciprocal space
 - `force_rebuild`: Force rebuild structure factor file even if exists (default: false)
 - `startbin`: Starting bin (default: 2)
 - `endbin`: Ending bin (default: all bins)
-- `dropmaxmin`: Number of max/min values to drop (default: 0)
+- `outlier_mode`: `:dropmaxmin` or `:iqrfence` (default: `:dropmaxmin`)
+- `outlier_param`: parameter for the selected outlier mode (default: 0, meaning no trimming/fence)
 - `orbital_columns`: Orbital column indices (default: [(3,4), (5,6), (7,8), (9,10)])
 - `orbital_labels`: Orbital labels (default: ["AA", "BA", "AB", "BB"])
 - `auto_digits`: Whether to automatically determine significant digits (default: true)
@@ -65,7 +67,8 @@ println("Correlation Ratio: \$(result.formatted_correlation_ratio)")
 """
 function AFMCorrelationRatio(shift_point::Tuple{<:Real,<:Real}, Q_point::Tuple{<:Real,<:Real}=(0.0, 0.0),
                          filename::String="afm_sf_k.bin", filedir::String=pwd();
-                         source_file::String="spsm_k.bin", force_rebuild::Bool=false, startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
+                         source_file::String="spsm_k.bin", force_rebuild::Bool=false, startbin::Int=2, endbin::Union{Int,Nothing}=nothing,
+                         outlier_mode::Symbol=:dropmaxmin, outlier_param::Real=0,
                          orbital_columns::Vector{Tuple{Int,Int}}=[(3,4), (5,6), (7,8), (9,10)],
                          orbital_labels::Vector{String}=["AA", "BA", "AB", "BB"],
                          auto_digits::Bool=true, k_point_tolerance::Float64=1e-6, verbose::Bool=true)
@@ -76,7 +79,8 @@ function AFMCorrelationRatio(shift_point::Tuple{<:Real,<:Real}, Q_point::Tuple{<
     end
     
     S_AFM_Q = AFMStructureFactor(Q_point, filename, filedir;
-                               force_rebuild=force_rebuild, source_file=source_file, startbin=startbin, endbin=endbin, dropmaxmin=dropmaxmin,
+                               force_rebuild=force_rebuild, source_file=source_file, startbin=startbin, endbin=endbin,
+                               outlier_mode=outlier_mode, outlier_param=outlier_param,
                                auto_digits=auto_digits, k_point_tolerance=k_point_tolerance, verbose=verbose)
     
     # 计算偏移后的k点坐标
@@ -90,7 +94,8 @@ function AFMCorrelationRatio(shift_point::Tuple{<:Real,<:Real}, Q_point::Tuple{<
     
     # 计算偏移点处的反铁磁结构因子（文件已在上一步生成，无需再次 rebuild）
     S_AFM_Q_shifted = AFMStructureFactor(Q_shifted, filename, filedir;
-                                       force_rebuild=false, source_file=source_file, startbin=startbin, endbin=endbin, dropmaxmin=dropmaxmin,
+                                       force_rebuild=false, source_file=source_file, startbin=startbin, endbin=endbin,
+                                       outlier_mode=outlier_mode, outlier_param=outlier_param,
                                        auto_digits=auto_digits, k_point_tolerance=k_point_tolerance, verbose=verbose)
     
     # 使用实部计算相关比（通常反铁磁结构因子主要是实部）
@@ -143,7 +148,8 @@ end
 """    
     CDWCorrelationRatio(shift_point::Tuple{<:Real,<:Real}, Q_point::Tuple{<:Real,<:Real}=(0.0, 0.0),
                      filename::String="cdwpair_sf_k.bin", source_file::String="cdwpair_k.bin", filedir::String=pwd();
-                     force_rebuild::Bool=false, startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
+                     force_rebuild::Bool=false, startbin::Int=2, endbin::Union{Int,Nothing}=nothing,
+                     outlier_mode::Symbol=:dropmaxmin, outlier_param::Real=0,
                      orbital_columns::Vector{Tuple{Int,Int}}=[(3,4), (5,6), (7,8), (9,10)],
                      orbital_labels::Vector{String}=["AA", "BA", "AB", "BB"],
                      auto_digits::Bool=true, k_point_tolerance::Float64=1e-6, verbose::Bool=true)
@@ -163,7 +169,8 @@ where δq is a small shift in reciprocal space
 - `force_rebuild`: Force rebuild structure factor file even if exists (default: false)
 - `startbin`: Starting bin (default: 2)
 - `endbin`: Ending bin (default: all bins)
-- `dropmaxmin`: Number of max/min values to drop (default: 0)
+- `outlier_mode`: `:dropmaxmin` or `:iqrfence` (default: `:dropmaxmin`)
+- `outlier_param`: parameter for the selected outlier mode (default: 0, meaning no trimming/fence)
 - `orbital_columns`: Orbital column indices (default: [(3,4), (5,6), (7,8), (9,10)])
 - `orbital_labels`: Orbital labels (default: ["AA", "BA", "AB", "BB"])
 - `auto_digits`: Whether to automatically determine significant digits (default: true)
@@ -192,7 +199,8 @@ println("Correlation Ratio: \$(result.formatted_correlation_ratio)")
 """
 function CDWCorrelationRatio(shift_point::Tuple{<:Real,<:Real}, Q_point::Tuple{<:Real,<:Real}=(0.0, 0.0),
                          filename::String="cdwpair_sf_k.bin", filedir::String=pwd();
-                         source_file::String="cdwpair_k.bin", force_rebuild::Bool=false, startbin::Int=2, endbin::Union{Int,Nothing}=nothing, dropmaxmin::Int=0,
+                         source_file::String="cdwpair_k.bin", force_rebuild::Bool=false, startbin::Int=2, endbin::Union{Int,Nothing}=nothing,
+                         outlier_mode::Symbol=:dropmaxmin, outlier_param::Real=0,
                          orbital_columns::Vector{Tuple{Int,Int}}=[(3,4), (5,6), (7,8), (9,10)],
                          orbital_labels::Vector{String}=["AA", "BA", "AB", "BB"],
                          auto_digits::Bool=true, k_point_tolerance::Float64=1e-6, verbose::Bool=true)
@@ -203,7 +211,8 @@ function CDWCorrelationRatio(shift_point::Tuple{<:Real,<:Real}, Q_point::Tuple{<
     end
     
     S_CDW_Q = CDWStructureFactor(Q_point, filename, filedir;
-                               force_rebuild=force_rebuild, source_file=source_file, startbin=startbin, endbin=endbin, dropmaxmin=dropmaxmin,
+                               force_rebuild=force_rebuild, source_file=source_file, startbin=startbin, endbin=endbin,
+                               outlier_mode=outlier_mode, outlier_param=outlier_param,
                                auto_digits=auto_digits, k_point_tolerance=k_point_tolerance, verbose=verbose)
     
     # Calculate shifted k-point coordinates
@@ -217,7 +226,8 @@ function CDWCorrelationRatio(shift_point::Tuple{<:Real,<:Real}, Q_point::Tuple{<
     
     # Calculate CDW structure factor at shifted point (file already generated, no need to rebuild)
     S_CDW_Q_shifted = CDWStructureFactor(Q_shifted, filename, filedir;
-                                       force_rebuild=false, source_file=source_file, startbin=startbin, endbin=endbin, dropmaxmin=dropmaxmin,
+                                       force_rebuild=false, source_file=source_file, startbin=startbin, endbin=endbin,
+                                       outlier_mode=outlier_mode, outlier_param=outlier_param,
                                        auto_digits=auto_digits, k_point_tolerance=k_point_tolerance, verbose=verbose)
     
     # Calculate correlation ratio using real part (typically CDW structure factor is mainly real)
