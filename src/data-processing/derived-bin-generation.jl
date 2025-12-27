@@ -13,7 +13,7 @@
 2. CDW和配对相关数据链：
    - 原始数据: nn_k.bin, pair_onsite_k.bin
    - 中间数据: cdw_k.bin, cdwpair_k.bin
-   - 最终数据: cdwpair_sf_k.bin （可以源于pair_onsite_k.bin, cdw_k.bin, cdwpair_k.bin）
+   - 最终数据: cdw_sf_k.bin, pair_onsite_sf_k.bin, cdwpair_sf_k.bin
 
 所有函数都提供明确的控制，不会自动判断是否需要更新文件。
 用户必须明确指示是否要生成文件。
@@ -24,7 +24,6 @@ export generate_all_derived_files, generate_all_derived_files_recursive
 """    
     generate_all_derived_files(dir::AbstractString=pwd();
                                afm_source::String="ss_k.bin", 
-                               cdwpair_source::String="cdwpair_k.bin", 
                                verbose::Bool=true)
 
 生成目录中所有衍生数据文件，包括反铁磁和电荷密度波/配对相关的文件。
@@ -32,7 +31,6 @@ export generate_all_derived_files, generate_all_derived_files_recursive
 # 参数
 - `dir::AbstractString=pwd()`: 数据目录，默认为当前目录
 - `afm_source::String="ss_k.bin"`: 用于生成反铁磁结构因子的源文件名，默认为"ss_k.bin"
-- `cdwpair_source::String="cdwpair_k.bin"`: 用于生成CDW配对结构因子的源文件名，默认为"cdwpair_k.bin"
 - `verbose::Bool=true`: 是否输出详细信息，默认为true
 
 # 返回值
@@ -44,16 +42,15 @@ export generate_all_derived_files, generate_all_derived_files_recursive
 files = generate_all_derived_files(verbose=true)
 
 # 指定目录和源文件
-files = generate_all_derived_files(dir="/path/to/data", afm_source="spsm_k.bin", cdwpair_source="cdw_k.bin")
+files = generate_all_derived_files(dir="/path/to/data", afm_source="spsm_k.bin", verbose=true)
 
 # 如果只需要生成特定类型的文件，可以直接调用相应的函数
 afm_files = afm_k_files_generation(dir, afm_source="spsm_k.bin")
-cdw_files = cdwpair_k_files_generation(dir, cdwpair_source="cdw_k.bin")
+cdw_files = cdwpair_k_files_generation(dir)
 ```
 """
 function generate_all_derived_files(dir::AbstractString=pwd();
                                     afm_source::String="ss_k.bin", 
-                                    cdwpair_source::String="cdwpair_k.bin", 
                                     verbose::Bool=true)
     result = Dict{String, String}()
     
@@ -65,7 +62,7 @@ function generate_all_derived_files(dir::AbstractString=pwd();
     merge!(result, afm_files)
     
     # 生成CDW和配对相关文件
-    cdw_files = cdwpair_k_files_generation(dir, cdwpair_source=cdwpair_source, verbose=verbose)
+    cdw_files = cdwpair_k_files_generation(dir, verbose=verbose)
     merge!(result, cdw_files)
     
     verbose && println("\n===== 衍生数据文件生成完成 =====")
@@ -86,7 +83,6 @@ end
                                          pattern::Regex=r".", 
                                          max_depth::Int=1,
                                          afm_source::String="ss_k.bin", 
-                                         cdwpair_source::String="cdwpair_k.bin", 
                                          verbose::Bool=true)
 
 递归地生成多个目录中的所有衍生数据文件。
@@ -96,7 +92,6 @@ end
 - `pattern::Regex=r"."`: 用于匹配目录名的正则表达式
 - `max_depth::Int=1`: 最大递归深度
 - `afm_source::String="ss_k.bin"`: 用于生成反铁磁结构因子的源文件名，默认为"ss_k.bin"
-- `cdwpair_source::String="cdwpair_k.bin"`: 用于生成CDW配对结构因子的源文件名，默认为"cdwpair_k.bin"
 - `verbose::Bool=true`: 是否输出详细信息，默认为true
 
 # 返回值
@@ -117,7 +112,6 @@ results = generate_all_derived_files_recursive(max_depth=2, verbose=true)
 results = generate_all_derived_files_recursive(
     base_dir="/path/to/data",
     afm_source="spsm_k.bin",
-    cdwpair_source="cdw_k.bin",
     verbose=true
 )
 ```
@@ -126,7 +120,6 @@ function generate_all_derived_files_recursive(base_dir::AbstractString=pwd();
                                               pattern::Regex=r".", 
                                               max_depth::Int=1,
                                               afm_source::String="ss_k.bin", 
-                                              cdwpair_source::String="cdwpair_k.bin", 
                                               verbose::Bool=true)
     result = Dict{String, Dict{String, String}}()
     
@@ -144,7 +137,6 @@ function generate_all_derived_files_recursive(base_dir::AbstractString=pwd();
         dir_result = generate_all_derived_files(
             base_dir; 
             afm_source=afm_source, 
-            cdwpair_source=cdwpair_source, 
             verbose=verbose
         )
         
@@ -168,7 +160,6 @@ function generate_all_derived_files_recursive(base_dir::AbstractString=pwd();
                 pattern=pattern, 
                 max_depth=max_depth-1,
                 afm_source=afm_source, 
-                cdwpair_source=cdwpair_source, 
                 verbose=verbose
             )
             

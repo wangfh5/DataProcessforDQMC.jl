@@ -406,17 +406,29 @@ function AFMStructureFactor(
     if !endswith(filename, ".bin")
         filename = filename * ".bin"
     end
+    # Ensure source_file has .bin extension
+    if !endswith(source_file, ".bin")
+        source_file = source_file * ".bin"
+    end
     target_filepath = joinpath(filedir, filename)
     
     # 如果强制重建或文件不存在，则重新生成文件
     if force_rebuild || !isfile(target_filepath)
         if verbose
             println("$(force_rebuild ? "强制重建" : "文件不存在")，正在生成 $filename...")
+            println("  源文件: $source_file")
         end
         
-        # 调用 afm_k_files_generation 函数重新生成文件
         try
-            result_files = afm_k_files_generation(filedir; afm_source=source_file, verbose=false)
+            # 如果用户指定 ss_k.bin 作为源文件但文件不存在，则尝试先生成它
+            source_path = joinpath(filedir, source_file)
+            if !isfile(source_path) && source_file == "ss_k.bin"
+                verbose && println("  未找到 ss_k.bin，尝试从 spsm_k.bin + szsz_k.bin 生成 ss_k.bin...")
+                combine_ss_components("spsm_k.bin", "szsz_k.bin", "ss_k.bin", filedir, filedir; verbose=false)
+            end
+
+            # 生成（或重建）目标结构因子文件：严格使用用户指定的 source_file -> filename
+            merge_afm_sf(source_file, filename, filedir, filedir; verbose=false)
 
             # 检查文件是否成功生成
             if !isfile(target_filepath)
@@ -510,17 +522,29 @@ function CDWStructureFactor(
     if !endswith(filename, ".bin")
         filename = filename * ".bin"
     end
+    # Ensure source_file has .bin extension
+    if !endswith(source_file, ".bin")
+        source_file = source_file * ".bin"
+    end
     target_filepath = joinpath(filedir, filename)
     
     # 如果强制重建或文件不存在，则重新生成文件
     if force_rebuild || !isfile(target_filepath)
         if verbose
             println("$(force_rebuild ? "强制重建" : "文件不存在")，正在生成 $filename...")
+            println("  源文件: $source_file")
         end
         
-        # 调用 cdwpair_k_files_generation 函数重新生成文件
         try
-            result_files = cdwpair_k_files_generation(filedir; cdwpair_source=source_file, verbose=false)
+            # 如果源文件不存在，尝试生成常见的派生源文件（cdw_k.bin / cdwpair_k.bin）
+            source_path = joinpath(filedir, source_file)
+            if !isfile(source_path)
+                verbose && println("  未找到源文件 $(source_file)，尝试生成相关派生文件...")
+                cdwpair_k_files_generation(filedir; verbose=false)
+            end
+
+            # 生成（或重建）目标结构因子文件：严格使用用户指定的 source_file -> filename
+            merge_cdw_sf(source_file, filename, filedir, filedir; verbose=false)
             
             # 检查文件是否成功生成
             if !isfile(target_filepath)
