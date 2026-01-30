@@ -4,6 +4,7 @@ using Printf
 
 export error, round_error, format_value_error
 export iqr_fence_filter, outlier_filter, remove_outliers
+export compute_cr_m2_covariance
 
 ## -------------------------------------------------------------------------- ##
 ##                              Outlier filtering                             ##
@@ -410,4 +411,112 @@ function compute_stats(real_values, imag_values; auto_digits=true)
         formatted_real = "$(formatted_real) ± $(formatted_real_err)",
         formatted_imag = "$(formatted_imag) ± $(formatted_imag_err)"
     )
+end
+
+"""
+    compute_cr_m2_covariance(m2_value, m2_error, cr_value, scaling_factor; return_components=false)
+
+计算相关比（Correlation Ratio）和缩放m²之间的协方差。
+
+# 数学推导
+
+给定独立测量量：
+- A = C(0) = m² （Q点的结构因子）
+- B = C(δk) （Q+δq点的结构因子）
+- Cov(A, B) = 0 （假设独立测量）
+
+定义：
+- K = L^(-(1+η_φ)) （缩放常数）
+- y = K·A （缩放后的m²）
+- x = 1 - B/A （相关比）
+
+使用误差传播公式：
+```
+σ_xy ≈ (∂x/∂A)(∂y/∂A)σ_A² + (∂x/∂B)(∂y/∂B)σ_B²
+```
+
+由于 ∂y/∂B = 0，第二项为零。计算偏导数：
+- ∂y/∂A = K
+- ∂x/∂A = B/A²
+
+因此：
+```
+σ_xy = (B/A²)·K·σ_A² = y·(1-x)·(σ_A/A)²
+```
+
+最终公式：
+```
+σ_xy = y·(1-x)·(σ_C(0)/C(0))²
+```
+
+# 参数
+
+- `m2_value::Real`: m² = C(0) 的值（Q点的结构因子）
+- `m2_error::Real`: σ_C(0)，m²的误差
+- `cr_value::Real`: x，相关比的值（通常为 1 - C(δk)/C(0)）
+- `scaling_factor::Real`: K = L^(-(1+η_φ))，缩放因子
+- `return_components::Bool`: 是否返回中间计算值（默认：false）
+
+# 返回值
+
+如果 `return_components=false`（默认）：
+- `(; covariance = σ_xy)` - 仅返回协方差值
+
+如果 `return_components=true`：
+- `(; covariance, scaled_m2, relative_error_m2)` - 返回协方差及中间值
+
+# 示例
+
+```julia
+# 基本用法
+m2 = 2.0
+σ_m2 = 0.1
+cr = 0.5
+K = 0.8
+result = compute_cr_m2_covariance(m2, σ_m2, cr, K)
+println("协方差: ", result.covariance)
+
+# 返回中间值用于调试
+result = compute_cr_m2_covariance(m2, σ_m2, cr, K; return_components=true)
+println("缩放m²: ", result.scaled_m2)
+println("相对误差: ", result.relative_error_m2)
+```
+
+# 参考
+
+- AFMCorrelationRatio: 计算反铁磁相关比
+- CDWCorrelationRatio: 计算CDW相关比
+- AFMStructureFactor: 计算反铁磁结构因子（m²）
+"""
+function compute_cr_m2_covariance(
+    m2_value::Real,
+    m2_error::Real,
+    cr_value::Real,
+    scaling_factor::Real;
+    return_components::Bool=false
+)
+    # 输入验证
+    @assert m2_value > 0 "m2_value must be positive, got $(m2_value)"
+    @assert m2_error >= 0 "m2_error must be non-negative, got $(m2_error)"
+    @assert scaling_factor > 0 "scaling_factor must be positive, got $(scaling_factor)"
+
+    # 计算缩放后的m²: y = K·A
+    scaled_m2 = scaling_factor * m2_value
+
+    # 计算相对误差: σ_A/A
+    relative_error = m2_error / m2_value
+
+    # 计算协方差: σ_xy = y·(1-x)·(σ_A/A)²
+    covariance = scaled_m2 * (1.0 - cr_value) * relative_error^2
+
+    # 根据标志返回结果
+    if return_components
+        return (;
+            covariance = covariance,
+            scaled_m2 = scaled_m2,
+            relative_error_m2 = relative_error
+        )
+    else
+        return (; covariance = covariance)
+    end
 end

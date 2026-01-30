@@ -1,3 +1,8 @@
+---
+description: 
+alwaysApply: true
+---
+
 # Repository Guidelines
 
 ## Project Structure & Module Organization
@@ -25,10 +30,6 @@
 - Create files like `test_structure_factor.jl` and include from `test/runtests.jl`.
 - Prefer deterministic tests; seed randomness when unavoidable.
 - Coverage is reported in CI (Codecov). Don’t decrease coverage; add tests for new or changed public APIs.
-
-## Commit & Pull Request Guidelines
-- Commit style follows history: emoji‑prefixed short summary (e.g., `✨ Introduce …`, `🐛 Fix …`, `♻️ Refactor …`, `📝 Docs …`, `⚡️ Perf …`, `🔨 Chore …`). Use imperative mood and keep scope concise.
-- PRs: clear description (what/why), link issues, note breaking changes, update docs/examples/tests, ensure CI passes, and request review.
 
 ## Data & Repository Hygiene
 - Do not commit large DQMC outputs or generated binaries; keep datasets local or in releases.
