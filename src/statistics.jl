@@ -51,26 +51,17 @@ function iqr_fence_filter(values; k::Real=10.0, min_n::Int=5)
     lo = q1 - kk * iqr
     hi = q3 + kk * iqr
 
-    kept_any = false
-    for (local_idx, global_idx) in enumerate(finite_idx)
-        v = vals[local_idx]
-        if lo <= v <= hi
-            keep[global_idx] = true
-            kept_any = true
-        else
-            if v < lo
-                removed_min += 1
-            elseif v > hi
-                removed_max += 1
-            end
-        end
-    end
-
-    if !kept_any
+    inrange = (lo .<= vals) .& (vals .<= hi)
+    if !any(inrange)
         keep[finite_idx] .= true
         removed_min = 0
         removed_max = 0
+        return (; keep, filtered=values[keep], removed_min, removed_max)
     end
+
+    keep[finite_idx[inrange]] .= true
+    removed_min = count(<(lo), vals)
+    removed_max = count(>(hi), vals)
 
     return (; keep, filtered=values[keep], removed_min, removed_max)
 end
@@ -82,6 +73,7 @@ end
 """
 function outlier_filter(values::AbstractVector, mode, param; min_n::Int=5)
     m = Symbol(lowercase(String(mode)))
+    dropnum = 0
     if m == :dropmaxmin
         dropnum = Int(param)
         dropnum < 0 && throw(ArgumentError("dropmaxmin must be >= 0, got $dropnum"))
@@ -102,18 +94,14 @@ function outlier_filter(values::AbstractVector, mode, param; min_n::Int=5)
     end
 
     if m == :dropmaxmin
-        dropnum = Int(param)
         if n_finite <= 2 * dropnum
             keep[finite_idx] .= true
             return (; keep, filtered=values[keep], removed_min=0, removed_max=0)
         end
         vals = Float64.(values[finite_idx])
         order = sortperm(vals)
-        drop_set = Set(finite_idx[order[1:dropnum]] ∪ finite_idx[order[(end - dropnum + 1):end]])
-        for idx in finite_idx
-            idx ∈ drop_set && continue
-            keep[idx] = true
-        end
+        kept = order[(dropnum + 1):(end - dropnum)]
+        keep[finite_idx[kept]] .= true
         return (; keep, filtered=values[keep], removed_min=dropnum, removed_max=dropnum)
     elseif m == :iqrfence
         return iqr_fence_filter(values; k=param, min_n)
