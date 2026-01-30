@@ -442,7 +442,7 @@ end
 - `m2_value::Real`: m² = C(0) 的值（Q点的结构因子）
 - `m2_error::Real`: σ_C(0)，m²的误差
 - `cr_value::Real`: x，相关比的值（通常为 1 - C(δk)/C(0)）
-- `scaling_factor::Real`: K = L^(-(1+η_φ))，缩放因子
+- `scaling_factor::Real`: 例如K = L^(1+η_φ)，缩放因子
 - `return_components::Bool`: 是否返回中间计算值（默认：false）
 
 # 返回值
@@ -507,4 +507,46 @@ function compute_cr_m2_covariance(
     else
         return (; covariance = covariance)
     end
+end
+
+"""
+    compute_cr_m2_covariance(scaled_m2, scaled_error, cr_value)
+
+计算相关比和缩放m²之间的协方差（简化版，直接使用 scaled 值）。
+
+由于 y = K·A 是线性缩放，相对误差保持不变：σ_y/y = σ_A/A
+因此可以直接使用 scaled 值计算协方差。
+
+# 参数
+- `scaled_m2::Real`: Y = K·m²，缩放后的 m² 值
+- `scaled_error::Real`: E = K·σ_m²，缩放后的误差
+- `cr_value::Real`: x，相关比的值
+
+# 返回值
+- `(; covariance)` - 协方差值 σ_xy
+
+# 示例
+```julia
+Y = 0.5    # scaled m²
+E = 0.02   # scaled error
+x = 0.3    # correlation ratio
+result = compute_cr_m2_covariance(Y, E, x)
+println("协方差: ", result.covariance)
+```
+
+# 参考
+- `compute_cr_m2_covariance(m2_value, m2_error, cr_value, scaling_factor)`: 4参数版本
+"""
+function compute_cr_m2_covariance(
+    scaled_m2::Real,
+    scaled_error::Real,
+    cr_value::Real
+)
+    @assert scaled_m2 > 0 "scaled_m2 must be positive, got $(scaled_m2)"
+    @assert scaled_error >= 0 "scaled_error must be non-negative, got $(scaled_error)"
+
+    relative_error = scaled_error / scaled_m2
+    covariance = scaled_m2 * (1.0 - cr_value) * relative_error^2
+
+    return (; covariance = covariance)
 end
