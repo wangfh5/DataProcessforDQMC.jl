@@ -7,5 +7,6 @@ using Test
     include("statistics_covariance_test.jl")
     include("scalar_measurements_iqrfence_kw_test.jl")
     include("structure_factor_outlier_filter_test.jl")
+    include("structure_factor_periodic_kpoint_matching_test.jl")
     include("correlation_ratio_outlier_filter_test.jl")
 end

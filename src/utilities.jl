@@ -15,6 +15,10 @@ export find_closest_k_point, find_coordinate_index
 
 Find the closest k-point in a set of k-points to a target k-point.
 
+The k-point coordinates are treated as periodic with period 1 in each direction,
+consistent with fractional Brillouin-zone coordinates used in the k-space bin files
+(e.g. `kx = m/L`, `ky = n/L`).
+
 # Arguments
 - `k_points::Vector{<:Tuple{<:Real,<:Real}}`: Vector of k-point coordinates [(kx1, ky1), (kx2, ky2), ...]
 - `target_k::Tuple{<:Real,<:Real}`: Target k-point (kx, ky)
@@ -35,7 +39,15 @@ closest_k, exact_match, distance = find_closest_k_point(k_points, target, 0.1)
 """
 function find_closest_k_point(k_points::Vector{<:Tuple{<:Real,<:Real}}, target_k::Tuple{<:Real,<:Real}, tolerance::Float64)
     # Calculate distance from each k-point to target
-    distances = [(kx, ky, sqrt((kx - target_k[1])^2 + (ky - target_k[2])^2)) for (kx, ky) in k_points]
+    # Use minimum-image distance on a 2D torus with period 1.0 (fractional BZ coords).
+    tx, ty = target_k
+    distances = [
+        begin
+            dx = mod((kx - tx) + 0.5, 1.0) - 0.5
+            dy = mod((ky - ty) + 0.5, 1.0) - 0.5
+            (kx, ky, sqrt(dx^2 + dy^2))
+        end for (kx, ky) in k_points
+    ]
     
     # Sort by distance
     sort!(distances, by = x -> x[3])
@@ -104,4 +116,3 @@ function find_coordinate_index(coords::Matrix, target_coord::Union{Tuple{Int, In
         return nothing, false
     end
 end
-
