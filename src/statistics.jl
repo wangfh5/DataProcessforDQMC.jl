@@ -2,6 +2,12 @@ using Statistics
 using DataFrames
 using Printf
 
+# Extend `Base.error` with a new method rather than shadowing it.
+# This avoids the "two modules export a different binding for `error`" ambiguity
+# that Julia otherwise reports (UndefVarError at call site) when user code does
+# `using DataProcessforDQMC` together with `error("some message")`.
+import Base: error
+
 export error, round_error, format_value_error
 export iqr_fence_filter, outlier_filter, remove_outliers
 export compute_cr_m2_covariance
@@ -123,11 +129,15 @@ end
 ## -------------------------------------------------------------------------- ##
 
 """
-    error(data; sigma=1, bessel=true, auto_digits=false)
-Calculate the standard error of the data.
+    error(data::AbstractVector; sigma=1, bessel=true, auto_digits=false)
+Calculate the standard error of a vector of samples.
+
+The parameter type is restricted to `AbstractVector` so that calls like
+`error("some message")` still fall through to `Base.error(::String)` and throw
+`ErrorException` as expected, instead of being misdispatched here.
 
 Arguments:
-- `data`: The data array
+- `data`: Vector of samples
 - `sigma`: Number of standard deviations (default: 1)
 - `bessel`: Whether to use Bessel's correction (N-1) for sample standard deviation (default: true)
 - `auto_digits`: Whether to automatically determine significant digits based on error of error (default: true)
@@ -135,7 +145,7 @@ Arguments:
 Returns:
 - Standard error multiplied by sigma, with appropriate precision if auto_digits=true
 """
-function error(data; sigma=1, bessel=true, auto_digits=true)
+function error(data::AbstractVector; sigma=1, bessel=true, auto_digits=true)
     # Handle empty or single-element arrays
     if length(data) <= 1
         return zero(eltype(data))
