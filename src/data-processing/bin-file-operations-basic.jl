@@ -5,14 +5,17 @@
 主要功能包括:
 1. 合并多个数据文件 （combine）
 2. 对数据文件的不同列进行标量缩放 （scale）
-3. 以线性叠加的方式合并数据文件的不同列为单列 （merge）
-    3.1 两轨道交错合并（merge_staggered_components）
-    3.2 两轨道均匀合并（merge_uniform_components）
+3. 将多列合并为单对 (Re, Im) 列（merge family, 层层特化）
+    3.0 最一般：用户提供 transform 回调（merge_bin_columns）
+    3.1 特例：标量实权重线性组合（merge_bin_columns_linear）
+    3.2 固定权重[1,1,-1,-1]：两轨道交错合并（merge_staggered_components）
+    3.3 固定权重[1,1, 1, 1]：两轨道均匀合并（merge_uniform_components）
 4. 提取特定坐标的所有bin数据 （filter）
 =#
 
 # 导出函数
-export combine_bin_files, scale_bin_columns, merge_bin_columns, filter_bin_file
+export combine_bin_files, scale_bin_columns, filter_bin_file
+export merge_bin_columns, merge_bin_columns_linear
 export merge_staggered_components, merge_uniform_components
 
 # ---------------------------------------------------------------------------- #
@@ -320,7 +323,7 @@ function scale_bin_columns(
 end
 
 """
-    function merge_bin_columns(
+    function merge_bin_columns_linear(
         input_filename::String,
         output_filename::String,
         real_columns::Vector{Int},
@@ -332,7 +335,15 @@ end
         verbose::Bool=false
     )
 
-将一个多列数据中的指定列合并为单列，生成新的数据文件。
+将多列复数数据用标量实权重做线性组合，合并为单对 (Re, Im) 列，生成新的数据文件。
+
+This is a scalar-linear-combination specialization of the more general
+[`merge_bin_columns`](@ref) (which accepts a user-supplied `transform`
+callback). The output is equivalent to
+
+    z_out = Σᵢ weights[i] * (row[real_columns[i]] + i * row[imag_columns[i]])
+
+per row, written as two (Re, Im) columns after the preserved columns.
 
 参数：
 - `input_filename`: 输入文件名
@@ -351,7 +362,7 @@ end
 示例：
 ```julia
 # 合并AA和BB轨道到单列文件
-merged_file = merge_bin_columns(
+merged_file = merge_bin_columns_linear(
     "spsm_k.bin",      # 输入文件名
     "merged.bin",       # 输出文件名
     [3, 9],           # 实部列（AA和BB轨道的实部）
@@ -360,7 +371,7 @@ merged_file = merge_bin_columns(
 )
 ```
 """
-function merge_bin_columns(
+function merge_bin_columns_linear(
     input_filename::String,
     output_filename::String,
     real_columns::Vector{Int},
@@ -371,89 +382,41 @@ function merge_bin_columns(
     preserve_columns::UnitRange{Int}=1:2,
     verbose::Bool=false
 )
-    # 确保输出文件名以 .bin 结尾
-    if !endswith(output_filename, ".bin")
-        output_filename = output_filename * ".bin"
-    end
-    
-    # 检查参数一致性
+    # Wrapper-specific contract: real/imag/weights length consistency. If any
+    # of real_columns / imag_columns reach past the input file's column count,
+    # the BoundsError raised inside the closure below will be caught by
+    # merge_bin_columns and reported as @error + "".
     @assert length(real_columns) == length(imag_columns) "实部列和虚部列数量必须相同"
     @assert length(weights) == length(real_columns) "权重数量必须与列对数量相同"
-    
-    # 构建输入和输出文件路径
-    input_path = joinpath(input_dir, input_filename)
-    if !isfile(input_path)
-        @error "找不到输入文件: $input_path"
-        return ""
-    end
-    
-    output_path = joinpath(output_dir, output_filename)
-    
-    # 读取输入文件
+
     if verbose
-        println("正在读取文件: $input_path")
-    end
-    
-    data = readdlm(input_path)
-    
-    # 创建输出数据
-    n_rows = size(data, 1)
-    n_preserved = length(preserve_columns)
-    output_data = zeros(n_rows, n_preserved + 2)  # +2 用于合并后的实部和虚部列
-    
-    # 复制要保留的列
-    output_data[:, 1:n_preserved] = data[:, preserve_columns]
-    
-    # 合并列
-    if verbose
-        println("正在合并列:")
+        println("merge_bin_columns_linear:")
         println("  实部列: $real_columns")
         println("  虚部列: $imag_columns")
-        println("  权重: $weights")
+        println("  权重:   $weights")
     end
-    
-    for i in 1:length(real_columns)
-        real_col = real_columns[i]
-        imag_col = imag_columns[i]
-        weight = weights[i]
-        
-        # 累加实部和虚部，应用权重
-        output_data[:, n_preserved + 1] .+= weight .* data[:, real_col]
-        output_data[:, n_preserved + 2] .+= weight .* data[:, imag_col]
-        
-        if verbose
-            println("  应用权重 $weight 到列 $real_col 和 $imag_col")
+
+    # Build the linear-combination closure and delegate to merge_bin_columns.
+    # The (_kx, _ky) coordinates are ignored — this specialization has no
+    # k-dependence.
+    transform_fn = (_kx, _ky, row) -> begin
+        re = 0.0
+        im = 0.0
+        @inbounds for i in eachindex(real_columns)
+            re += weights[i] * row[real_columns[i]]
+            im += weights[i] * row[imag_columns[i]]
         end
+        return (re, im)
     end
-    
-    # 写入结果到输出文件，使用与原始文件相同的格式
-    if verbose
-        println("正在写入合并后的文件: $output_path")
-    end
-    
-    open(output_path, "w") do io
-        for i in 1:size(output_data, 1)
-            for j in 1:size(output_data, 2)
-                val = output_data[i, j]
-                if isa(val, AbstractFloat)
-                    # 使用与 Fortran e16.8 相匹配的格式
-                    formatted = @sprintf("%16.8e", val)
-                    write(io, formatted)
-                else
-                    # 对于非浮点数，使用固定宽度格式
-                    formatted = @sprintf("%16s", string(val))
-                    write(io, formatted)
-                end
-            end
-            write(io, "\n")
-        end
-    end
-    
-    if verbose
-        println("列合并完成: $output_path")
-    end
-    
-    return output_path
+
+    return merge_bin_columns(
+        input_filename, output_filename;
+        transform=transform_fn,
+        input_dir=input_dir,
+        output_dir=output_dir,
+        preserve_columns=preserve_columns,
+        verbose=verbose,
+    )
 end
 
 # ---------------------------------------------------------------------------- #
@@ -532,9 +495,9 @@ function merge_staggered_components(
         println("C: 列 $(real_columns[3]) (实部), $(imag_columns[3]) (虚部), 权重: -1.0")
         println("D: 列 $(real_columns[4]) (实部), $(imag_columns[4]) (虚部), 权重: -1.0")
     end
-    
-    # 调用通用的merge_bin_columns函数
-    result = merge_bin_columns(
+
+    # Delegate to merge_bin_columns_linear (the scalar-linear specialization).
+    result = merge_bin_columns_linear(
         input_filename,
         output_filename,
         real_columns,
@@ -545,7 +508,7 @@ function merge_staggered_components(
         preserve_columns=preserve_columns,
         verbose=verbose
     )
-    
+
     return result
 end
 
@@ -622,9 +585,9 @@ function merge_uniform_components(
         println("C: 列 $(real_columns[3]) (实部), $(imag_columns[3]) (虚部), 权重: 1.0")
         println("D: 列 $(real_columns[4]) (实部), $(imag_columns[4]) (虚部), 权重: 1.0")
     end
-    
-    # 调用通用的merge_bin_columns函数
-    result = merge_bin_columns(
+
+    # Delegate to merge_bin_columns_linear (the scalar-linear specialization).
+    result = merge_bin_columns_linear(
         input_filename,
         output_filename,
         real_columns,
@@ -635,7 +598,7 @@ function merge_uniform_components(
         preserve_columns=preserve_columns,
         verbose=verbose
     )
-    
+
     return result
 end
 
@@ -798,5 +761,160 @@ function filter_bin_file(
         println("Extracted $n_bins bins for coordinate $coordinate")
     end
     
+    return output_path
+end
+
+# ---------------------------------------------------------------------------- #
+#              Row-level k-dependent complex transform helper                  #
+# ---------------------------------------------------------------------------- #
+
+"""
+    merge_bin_columns(input_filename::String, output_filename::String;
+                      transform::Function,
+                      input_dir::String=pwd(),
+                      output_dir::String=pwd(),
+                      preserve_columns::UnitRange{Int}=1:2,
+                      k_columns::Tuple{Int,Int}=(1, 2),
+                      verbose::Bool=false) -> String
+
+Apply a row-level, user-defined transform to a bin file and write the result as
+a new bin file containing the preserved columns followed by two columns
+(Re, Im) of the transform output.
+
+This is the most general member of the `merge_bin_columns*` family. The user
+supplies a `transform(kx, ky, row)` callback that can mix any columns with any
+(possibly k-dependent, possibly complex) coefficients. For the common case of
+a scalar real linear combination of (Re, Im) column pairs, prefer the
+specialization [`merge_bin_columns_linear`](@ref); fixed-weight wrappers for
+2-orbital staggered / uniform combinations live at
+[`merge_staggered_components`](@ref) and [`merge_uniform_components`](@ref).
+
+# Arguments
+- `input_filename::String`: input bin file name (under `input_dir`)
+- `output_filename::String`: output bin file name (under `output_dir`); a
+  trailing `.bin` is appended if missing
+- `transform::Function`: callback
+  `transform(kx::Float64, ky::Float64, row::AbstractVector{Float64})` that must
+  return either a `Complex` or a 2-tuple `(re, im)` of `<:Real` derived scalar.
+  Returning any other type raises an `ArgumentError`. If `transform` indexes a
+  column beyond the input file's column count, the resulting `BoundsError` is
+  caught and turned into `@error + return ""` (see Returns).
+- `input_dir::String=pwd()`: directory holding `input_filename`
+- `output_dir::String=pwd()`: directory to write `output_filename` into
+- `preserve_columns::UnitRange{Int}=1:2`: columns copied verbatim to the output
+  (typically the `(kx, ky)` coordinates). These are *only* about what lands in
+  the output file — they do NOT control which columns `transform` sees as
+  `(kx, ky)`. See `k_columns`.
+- `k_columns::Tuple{Int,Int}=(1,2)`: the (one-based) column indices in the
+  *input* file that hold `(kx, ky)`. Their values are what the callback
+  receives as its first two arguments. Defaults to `(1,2)` to match the
+  standard bin-file layout.
+- `verbose::Bool=false`: if `true`, log the I/O paths
+
+# Returns
+- `String`: absolute path of the written file, or `""` if the input is missing,
+  `preserve_columns`/`k_columns` point past the file's column count, or
+  `transform` triggers a `BoundsError` accessing its `row` argument.
+
+# Example
+```julia
+# Landau-gauge combination G_cal = 0.5*(G_AA - G_BB) + i*exp(i*k_y)*G_AB
+# from a cpcm_piflux_k.bin file (cols 3-4 G_AA, 7-8 G_AB, 9-10 G_BB).
+# Note: the file's col-2 is k_y in magnetic-basis units (b_2^Mag = π/a),
+# so the phase factor uses `π * ky_Mag` in the argument.
+merge_bin_columns(
+    "cpcm_piflux_k.bin", "gcal_piflux_k.bin";
+    input_dir = run_dir, output_dir = run_dir,
+    transform = (kx_Mag, ky_Mag, row) -> begin
+        G_AA = complex(row[3], row[4])
+        G_AB = complex(row[7], row[8])
+        G_BB = complex(row[9], row[10])
+        ky_bare = π * ky_Mag
+        phase = complex(-2 * sin(ky_bare), 2 * cos(ky_bare))  # 2i * exp(i*k_y)
+        return 0.5 * ((G_AA - G_BB) + phase * G_AB)
+    end,
+)
+```
+"""
+function merge_bin_columns(
+    input_filename::String,
+    output_filename::String;
+    transform::Function,
+    input_dir::String=pwd(),
+    output_dir::String=pwd(),
+    preserve_columns::UnitRange{Int}=1:2,
+    k_columns::Tuple{Int,Int}=(1, 2),
+    verbose::Bool=false
+)
+    input_path = joinpath(input_dir, input_filename)
+    if !isfile(input_path)
+        @error "Input bin file not found: $input_path"
+        return ""
+    end
+    if !endswith(output_filename, ".bin")
+        output_filename = output_filename * ".bin"
+    end
+    output_path = joinpath(output_dir, output_filename)
+
+    data = readdlm(input_path, Float64)
+    n_rows, n_cols = size(data)
+    n_pres = length(preserve_columns)
+
+    # Column-count guard for what THIS helper directly indexes. Whatever the
+    # user's `transform` touches is its own contract — if it over-reaches, the
+    # BoundsError from inside the per-row loop below is caught and reported as
+    # @error + return "" instead of leaking a raw stacktrace.
+    required_cols = max(maximum(preserve_columns), max(k_columns[1], k_columns[2]))
+    if n_cols < required_cols
+        @error "Input file has $n_cols columns; preserve_columns=$preserve_columns, k_columns=$k_columns require at least $required_cols" file=input_path
+        return ""
+    end
+
+    out = zeros(Float64, n_rows, n_pres + 2)
+    out[:, 1:n_pres] .= data[:, preserve_columns]
+
+    kx_col, ky_col = k_columns
+    for i in 1:n_rows
+        row = @view data[i, :]
+        local result
+        try
+            result = transform(data[i, kx_col], data[i, ky_col], row)
+        catch e
+            # Only catch BoundsError raised ON `row` itself (i.e. transform
+            # indexing past the input file's columns). Any other BoundsError
+            # — e.g. in an internal array the callback allocates — is a bug
+            # in the caller's transform and should rethrow untouched.
+            if e isa BoundsError && e.a === row
+                @error "merge_bin_columns: transform accessed a column beyond input file's $n_cols columns" file=input_path row_index=i exception=(e, catch_backtrace())
+                return ""
+            else
+                rethrow()
+            end
+        end
+        re, im = if result isa Complex
+            (Float64(real(result)), Float64(imag(result)))
+        elseif result isa Tuple{<:Real, <:Real}
+            (Float64(result[1]), Float64(result[2]))
+        else
+            throw(ArgumentError("merge_bin_columns: transform must return Complex or a 2-tuple of Real (re, im); got $(typeof(result))"))
+        end
+        out[i, n_pres + 1] = re
+        out[i, n_pres + 2] = im
+    end
+
+    open(output_path, "w") do io
+        for i in 1:n_rows
+            for j in 1:(n_pres + 2)
+                @printf(io, "%16.8e", out[i, j])
+            end
+            write(io, "\n")
+        end
+    end
+
+    if verbose
+        println("merge_bin_columns:")
+        println("  input : $input_path")
+        println("  output: $output_path")
+    end
     return output_path
 end
