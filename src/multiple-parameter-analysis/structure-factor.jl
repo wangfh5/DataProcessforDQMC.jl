@@ -42,8 +42,9 @@ function _init_result_dataframe(
     
     # k 点坐标列（仅多 k 版本）
     if include_k_cols
-        result_df[!, :kx] = Float64[]
-        result_df[!, :ky] = Float64[]
+        result_df[!, :kx]      = Float64[]
+        result_df[!, :ky]      = Float64[]
+        result_df[!, :k_index] = Int[]
     end
     
     # 结果列
@@ -258,14 +259,22 @@ end
 返回长表，每个参数目录 × 每个 k 点一行，包含 :kx 和 :ky 列。
 
 # 参数
-- `analyzer_function::Function`: 用于分析结构因子的函数，必须支持多 k 点输入
+- `analyzer_function::Function`: 用于分析结构因子的函数，必须支持多 k 点输入。
+
+  !!! warning "契约"
+      analyzer 必须为每个输入 k 点返回**一个**结果且**顺序保持**，否则
+      `:k_index` 与原始槽位会错位。数量不一致时本函数立即 throw（不静默
+      压缩重编号）；顺序错乱无法在运行时检测，由 caller 自行保证。
+
 - `k_points::Vector{<:Tuple{<:Real,<:Real}}`: 要分析的k点列表（位置参数）
 - `base_dir::AbstractString=pwd()`: 基础目录路径，默认为当前工作目录
 - 其他参数同单 k 点版本
 
 # 返回值
 - `DataFrame`: 包含所有参数、k点坐标和分析结果的DataFrame（长表）
-  新增列：:kx, :ky
+  新增列：:kx, :ky, :k_index，其中 :k_index ∈ 1:length(k_points) 标记 row
+  来自 caller 传入 `k_points` 列表中的哪个槽位（PBC 折回的重复点也得到
+  不同 :k_index，下游可以无歧义区分而无需依赖 (kx, ky)）。
 """
 function analyze_structure_factor_multi_parameter(analyzer_function::Function,
                                            k_points::Vector{<:Tuple{<:Real,<:Real}},
@@ -332,9 +341,17 @@ function analyze_structure_factor_multi_parameter(analyzer_function::Function,
                 verbose=false
             )
             
-            # Process each k-point result
-            for result in analysis_results
+            # Guard :k_index 1:1 contract: StructureFactorAnalysis silently
+            # `continue`s past k-points on missing data / invalid bin / outlier
+            # wipe, which would compress :k_index and break consumer joins.
+            length(analysis_results) == length(k_points) || error(
+                "Multi-k analyzer returned $(length(analysis_results)) results " *
+                "for $(length(k_points)) k-points in $dirname; :k_index would " *
+                "be ambiguous. Check @warn output above for skipped k-points.")
+
+            for (k_idx, result) in enumerate(analysis_results)
                 row = _create_result_row(params, result, result_columns, result_prefix; include_k_point=true)
+                row[:k_index] = k_idx
                 push!(result_df, row)
             end
             
