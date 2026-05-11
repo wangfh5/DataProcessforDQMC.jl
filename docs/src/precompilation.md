@@ -76,6 +76,19 @@ DataProcessforDQMC.compile()
 !!! note "编译时间"
     首次编译可能需要1-2分钟，请耐心等待。
 
+### 把额外的常用包打进 sysimage
+
+`compile()` 接受 `additional_packages` 关键字参数，把启动时常用的其它包（如 `OhMyREPL`、`Revise`、`Plots` 等）一并 baked 进 sysimage，避免 `jd` 启动时再触发 precompile：
+
+```julia
+DataProcessforDQMC.compile(additional_packages=[:OhMyREPL])
+```
+
+列表中的包必须已经安装在当前 active project 中（通常是 `@v1.x` 默认环境）。
+
+!!! tip "OhMyREPL 强烈建议加入"
+    Julia 1.11 + OhMyREPL v0.5.32 组合下，若用户 `startup.jl` 在 `atreplinit` 里 `using OhMyREPL`，启动 `jd` 时会触发一次 precompile 子进程；该子进程继承 sysimage 后，Pkg 的 `REPLExt` extension 不会自动激活，`OhMyREPL/src/BracketInserter.jl` 会以 `type Nothing has no field promptf` 报错。把 `:OhMyREPL` 加入 `additional_packages` 让它在 sysimage 中直接 baked 加载，可彻底规避该问题。
+
 ## ⚙️ 配置Julia启动器
 
 将以下配置添加到您的 `~/.bashrc` 或 `~/.zshrc` 文件中：
@@ -208,6 +221,17 @@ ls -la ~/.julia/sysimages/sys_dataprocessfordqmc.so
 ```julia
 using Pkg
 Pkg.add("PackageCompiler")
+```
+
+### `jd` 启动时反复触发 OhMyREPL precompile 并失败
+现象：每次 `jd` 启动都出现 `Precompiling OhMyREPL...` → `type Nothing has no field promptf` 错误。
+
+原因：Julia 1.11 在带 sysimage 的 precompile 子进程里不会激活 Pkg 的 `REPLExt` extension，OhMyREPL 顶层依赖该 extension 来取 `promptf`。
+
+解决：把 OhMyREPL baked 进 sysimage：
+```julia
+using DataProcessforDQMC, PackageCompiler
+DataProcessforDQMC.compile(additional_packages=[:OhMyREPL])
 ```
 
 !!! tip "建议"
