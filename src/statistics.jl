@@ -240,10 +240,14 @@ end
 
 误差会按照给定的有效数字数目进行向上取整，数值会匹配同样的精度。
 
+当 `error_sig_digits = 0` 时按量级引用误差：向上进到前导位的上一位
+（如 0.0069 → 0.01），数值按同一精度显示。适用于 err_of_err 与 err
+同量级、误差棒本身只可信到量级的情形（例如 bootstrap 成功样本太少）。
+
 参数:
 - `value`: 待格式化的数值
 - `error`: 该数值的误差
-- `error_sig_digits`: 误差保留的有效数字个数 (默认: 1)
+- `error_sig_digits`: 误差保留的有效数字个数 (默认: 1；取 0 表示按量级引用)
 - `format`: 输出格式，`:scientific`(默认) 返回科学计数法字符串，`:decimal` 返回普通小数
 
 返回:
@@ -258,6 +262,9 @@ format_value_error(2367.38, 23, 2)                       # ("2.367e+03", "0.023e
 # 普通小数
 format_value_error(2.36738, 0.0023; format=:decimal)     # ("2.367", "0.003")
 format_value_error(2367.38, 23; format=:decimal)         # ("2370", "30")
+
+# 按量级引用 (error_sig_digits = 0)
+format_value_error(5.4238, 0.0069, 0; format=:decimal)   # ("5.42", "0.01")
 ```
 """
 function format_value_error(value::Number, error::Number, error_sig_digits::Int=1; format::Symbol=:scientific)
@@ -283,14 +290,22 @@ function format_value_error(value::Number, error::Number, error_sig_digits::Int=
 
     # Step 1: Determine the digits of the error based on its significant digits and error
     # Round the error first, then derive its order; this keeps value precision in sync
-    rounded_error = round(error, RoundUp, sigdigits=error_sig_digits)
-    # For non-zero errors, calculate order of magnitude (err = x.x × 10^error_order)
-    # For example
-    # - If error = 23456, error_order = 4;
-    # - If error = 2.3456, error_order = 0;
-    # - If error = 0.00943, error_sig_digits = 2, rounded_error = 0.0095, error_order = -3;
-    # - If error = 0.00943, error_sig_digits = 1, rounded_error = 0.01, error_order = -2;
-    error_order = floor(log10(abs(rounded_error)))
+    if error_sig_digits == 0
+        # Order-of-magnitude quoting: the error is already uncertain at its leading
+        # digit, so round up to the position above it. Idempotent for exact powers of ten.
+        raw_order = floor(Int, log10(abs(error)))
+        error_order = error <= 10.0^raw_order * (1 + 1e-12) ? raw_order : raw_order + 1
+        rounded_error = 10.0^error_order
+    else
+        rounded_error = round(error, RoundUp, sigdigits=error_sig_digits)
+        # For non-zero errors, calculate order of magnitude (err = x.x × 10^error_order)
+        # For example
+        # - If error = 23456, error_order = 4;
+        # - If error = 2.3456, error_order = 0;
+        # - If error = 0.00943, error_sig_digits = 2, rounded_error = 0.0095, error_order = -3;
+        # - If error = 0.00943, error_sig_digits = 1, rounded_error = 0.01, error_order = -2;
+        error_order = floor(log10(abs(rounded_error)))
+    end
     # Check if error_order is -Inf (can happen with very small numbers due to floating point precision)
     if isinf(error_order)
         # Use the smallest representable order for very small numbers
@@ -303,7 +318,9 @@ function format_value_error(value::Number, error::Number, error_sig_digits::Int=
     # - If error = 2.3456, error_sig_digits = 3, error_digits = 0 + 3 - 1 = 2;
     # - If error = 0.00943, error_sig_digits = 2, error_digits = 3 + 2 - 1 = 4;
     # - If error = 0.00943, error_sig_digits = 1, error_digits = 2 + 1 - 1 = 2;
-    error_digits = - Int(error_order - error_sig_digits + 1)
+    # error_sig_digits == 0 shows the escalated error's single leading digit
+    disp_sig_digits = error_sig_digits == 0 ? 1 : error_sig_digits
+    error_digits = - Int(error_order - disp_sig_digits + 1)
 
     # Step 2: Round the value to match the precision of the error
     value_digits = error_digits
@@ -346,7 +363,7 @@ function format_value_error(value::Number, error::Number, error_sig_digits::Int=
             err_str = "0e$(err_exponent)"
         else
             err_magnitude = abs(rounded_error) / 10.0^err_exponent
-            rounded_error_format = round(err_magnitude, sigdigits=error_sig_digits)
+            rounded_error_format = round(err_magnitude, sigdigits=disp_sig_digits)
             err_str = "$(rounded_error_format)e$(err_exponent)"
         end
     elseif format == :decimal

@@ -15,4 +15,12 @@ using DataProcessforDQMC: format_value_error
     val_str, err_str = format_value_error(0.7012047252570854, 0.009466208599346684; format=:decimal)
     @test val_str == "0.70"
     @test err_str == "0.01"
+
+    # Order-of-magnitude quoting (error_sig_digits=0): the error rounds up to the
+    # position above its leading digit, and value precision stays aligned
+    @test format_value_error(5.423756758475438, 0.0069434274377905714, 0; format=:decimal) == ("5.42", "0.01")
+    # Idempotent for an error already sitting on a power of ten
+    @test format_value_error(5.423756758475438, 0.01, 0; format=:decimal) == ("5.42", "0.01")
+    # Scientific format
+    @test format_value_error(5.423756758475438, 0.01, 0) == ("5.42e+00", "0.01e0")
 end
