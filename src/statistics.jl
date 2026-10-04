@@ -239,6 +239,9 @@ end
 格式化数值及其误差，支持科学计数法或普通小数表示。
 
 误差会按照给定的有效数字数目进行向上取整，数值会匹配同样的精度。
+若向上取整进位到更高一个数量级（如 0.0097 → 0.01），则多保留一位，
+保持未取整误差的小数位（显示为 0.010，与 PDG 惯例一致）。
+因此应传入未取整的误差；先取整再传入会丢失进位信息。
 
 当 `error_sig_digits = 0` 时按量级引用误差：向上进到前导位的上一位
 （如 0.0069 → 0.01），数值按同一精度显示。适用于 err_of_err 与 err
@@ -265,6 +268,9 @@ format_value_error(2367.38, 23; format=:decimal)         # ("2370", "30")
 
 # 按量级引用 (error_sig_digits = 0)
 format_value_error(5.4238, 0.0069, 0; format=:decimal)   # ("5.42", "0.01")
+
+# 向上取整进位到更高数量级时保留原小数位
+format_value_error(1.336759, 0.000979; format=:decimal)  # ("1.3368", "0.0010")
 ```
 """
 function format_value_error(value::Number, error::Number, error_sig_digits::Int=1; format::Symbol=:scientific)
@@ -296,6 +302,7 @@ function format_value_error(value::Number, error::Number, error_sig_digits::Int=
         raw_order = floor(Int, log10(abs(error)))
         error_order = error <= 10.0^raw_order * (1 + 1e-12) ? raw_order : raw_order + 1
         rounded_error = 10.0^error_order
+        carried = false
     else
         rounded_error = round(error, RoundUp, sigdigits=error_sig_digits)
         # For non-zero errors, calculate order of magnitude (err = x.x × 10^error_order)
@@ -305,6 +312,9 @@ function format_value_error(value::Number, error::Number, error_sig_digits::Int=
         # - If error = 0.00943, error_sig_digits = 2, rounded_error = 0.0095, error_order = -3;
         # - If error = 0.00943, error_sig_digits = 1, rounded_error = 0.01, error_order = -2;
         error_order = floor(log10(abs(rounded_error)))
+        # Rounding up can carry into the next decade (0.0097 -> 0.01). Keep the decimal
+        # place of the unrounded error by showing one more digit, "0.010" (PDG convention).
+        carried = error_order > floor(log10(abs(error)))
     end
     # Check if error_order is -Inf (can happen with very small numbers due to floating point precision)
     if isinf(error_order)
@@ -319,7 +329,7 @@ function format_value_error(value::Number, error::Number, error_sig_digits::Int=
     # - If error = 0.00943, error_sig_digits = 2, error_digits = 3 + 2 - 1 = 4;
     # - If error = 0.00943, error_sig_digits = 1, error_digits = 2 + 1 - 1 = 2;
     # error_sig_digits == 0 shows the escalated error's single leading digit
-    disp_sig_digits = error_sig_digits == 0 ? 1 : error_sig_digits
+    disp_sig_digits = error_sig_digits == 0 ? 1 : error_sig_digits + carried
     error_digits = - Int(error_order - disp_sig_digits + 1)
 
     # Step 2: Round the value to match the precision of the error
@@ -363,8 +373,13 @@ function format_value_error(value::Number, error::Number, error_sig_digits::Int=
             err_str = "0e$(err_exponent)"
         else
             err_magnitude = abs(rounded_error) / 10.0^err_exponent
-            rounded_error_format = round(err_magnitude, sigdigits=disp_sig_digits)
-            err_str = "$(rounded_error_format)e$(err_exponent)"
+            if carried
+                # Print the trailing zero of a carried error explicitly, e.g. "0.0010e0"
+                err_str = @sprintf("%.*fe%d", max(error_digits + err_exponent, 0), err_magnitude, err_exponent)
+            else
+                rounded_error_format = round(err_magnitude, sigdigits=disp_sig_digits)
+                err_str = "$(rounded_error_format)e$(err_exponent)"
+            end
         end
     elseif format == :decimal
         # Format as plain decimal

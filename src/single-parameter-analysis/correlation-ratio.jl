@@ -111,11 +111,8 @@ function AFMCorrelationRatio(shift_point::Tuple{<:Real,<:Real}, Q_point::Tuple{<
     
     err_ratio = sqrt((S2/(S1^2) * dS1)^2 + (1/S1 * dS2)^2)
     
-    # 使用round_error函数保留一位有效数字
-    rounded_err, _ = round_error(err_ratio, err_ratio/10)
-    
     # 使用format_value_error函数格式化结果
-    formatted_val, formatted_err = format_value_error(correlation_ratio, rounded_err, 1)
+    formatted_val, formatted_err = format_value_error(correlation_ratio, err_ratio, 1)
     formatted_correlation_ratio = "$(formatted_val) ± $(formatted_err)"
     
     # 打印结果
@@ -243,11 +240,8 @@ function CDWCorrelationRatio(shift_point::Tuple{<:Real,<:Real}, Q_point::Tuple{<
     
     err_ratio = sqrt((S2/(S1^2) * dS1)^2 + (1/S1 * dS2)^2)
     
-    # Round error to one significant digit
-    rounded_err, _ = round_error(err_ratio, err_ratio/10)
-    
     # Format result with value and error
-    formatted_val, formatted_err = format_value_error(correlation_ratio, rounded_err, 1)
+    formatted_val, formatted_err = format_value_error(correlation_ratio, err_ratio, 1)
     formatted_correlation_ratio = "$(formatted_val) ± $(formatted_err)"
     
     # Print results
