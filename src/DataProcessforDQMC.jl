@@ -9,10 +9,11 @@ using CSV
 # Utility functions
 include("utilities.jl")
 
-# 导入 JobManage 子模块
-include("JobManage/JobManage.jl")
-using .JobManage
-# 重新导出 JobManage 的核心函数，让用户直接使用
+# 作业命名与 SimulationInfo 由独立包 DQMCJobManage 提供
+using DQMCJobManage
+# 过渡别名：保持 `using DataProcessforDQMC.JobManage` 可用
+const JobManage = DQMCJobManage
+# 重新导出 DQMCJobManage 的核心函数，让用户直接使用
 export generate_jobname, parse_jobname, parse_jobname_legacy
 export migrate_legacy_to_new, verify_migration
 export SimulationInfo, save_simulation_info

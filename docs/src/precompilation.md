@@ -51,6 +51,9 @@ julia
 ```julia
 using Pkg
 
+# 先添加未注册的依赖 DQMCJobManage
+Pkg.add(url="https://github.com/wangfh5/DQMCJobManage.jl")
+
 # 方式1：仅使用（推荐）
 Pkg.add(path="/path/to/DataProcessforDQMC")
 
