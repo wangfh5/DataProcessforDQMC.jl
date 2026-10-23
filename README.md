@@ -21,8 +21,11 @@ A Julia package for processing determinantal quantum Monte Carlo (DQMC) simulati
 
 ```julia
 julia> ]
+pkg> add https://github.com/wangfh5/DQMCJobManage.jl
 pkg> add https://github.com/wangfh5/DataProcessforDQMC.jl
 ```
+
+Job naming (`generate_jobname`, `parse_jobname`, `SimulationInfo`, …) lives in the lightweight package [DQMCJobManage.jl](https://github.com/wangfh5/DQMCJobManage.jl) and is re-exported here. It is not registered, so add it first; job submission scripts can depend on DQMCJobManage alone.
 
 ### Basic Usage
 

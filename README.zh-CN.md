@@ -22,8 +22,11 @@
 
 ```julia
 julia> ]
+pkg> add https://github.com/wangfh5/DQMCJobManage.jl
 pkg> add https://github.com/wangfh5/DataProcessforDQMC.jl
 ```
+
+作业命名（`generate_jobname`、`parse_jobname`、`SimulationInfo` 等）在轻量包 [DQMCJobManage.jl](https://github.com/wangfh5/DQMCJobManage.jl) 中实现，本包重新导出。它尚未注册，需要先添加；作业提交脚本可以只依赖 DQMCJobManage。
 
 ### 基本使用
 

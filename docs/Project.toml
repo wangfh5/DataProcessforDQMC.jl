@@ -1,3 +1,7 @@
 [deps]
+DQMCJobManage = "2f30fa66-c0b8-4678-90a3-8f00cf1e6769"
 DataProcessforDQMC = "46f08351-ef40-491d-b5bb-ec4458782aec"
 Documenter = "e30172f5-a6a5-5a46-863b-614d45cd2de4"
+
+[sources]
+DQMCJobManage = {url = "https://github.com/wangfh5/DQMCJobManage.jl"}
