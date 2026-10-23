@@ -6,10 +6,11 @@ alwaysApply: true
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `src/` core package code. Submodules: `JobManage/`, `data-processing/`, `single-parameter-analysis/`, `multiple-parameter-analysis/`, `packagecompile/`.
+- `src/` core package code. Submodules: `data-processing/`, `single-parameter-analysis/`, `multiple-parameter-analysis/`, `packagecompile/`.
 - `test/` unit tests (`runtests.jl`). Add feature tests as separate files and include them from `runtests.jl`.
 - `docs/` Documenter.jl site (`docs/make.jl`).
 - `examples/` runnable scripts (e.g., `examples/test_multi_param.jl`).
+- Job naming (`generate_jobname`, `parse_jobname`, `SimulationInfo`, …) lives in the separate package [DQMCJobManage.jl](https://github.com/wangfh5/DQMCJobManage.jl); it is re-exported here, and `DataProcessforDQMC.JobManage` is kept as an alias.
 - `ext/` Package extension for optional `PackageCompiler` integration.
 
 ## Build, Test, and Development Commands

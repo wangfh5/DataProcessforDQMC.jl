@@ -1,7 +1,7 @@
 # Precompile statements for DataProcessforDQMC
 # This file executes typical usage patterns to trigger compilation
 
-using DataProcessforDQMC.JobManage
+using DataProcessforDQMC.DQMCJobManage
 
 # Wrap precompile calls in try-catch block
 # Even if execution fails (e.g., due to missing files), compilation is triggered

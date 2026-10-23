@@ -9,6 +9,8 @@
 4. 批量迁移legacy格式文件夹名
 =#
 
+using DQMCJobManage: parse_jobname, parse_jobname_legacy, generate_jobname, verify_migration
+
 export scan_parameter_directories,
        save_analysis_results,
        batch_migrate_directories
