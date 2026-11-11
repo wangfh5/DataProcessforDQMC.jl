@@ -536,10 +536,13 @@ function CDWStructureFactor(
         end
         
         try
-            # 如果源文件不存在，尝试生成常见的派生源文件（cdw_k.bin / cdwpair_k.bin）
+            # 派生源文件（cdw_k.bin / cdwpair_k.bin）随原始 bin 一并重新生成；
+            # 否则模拟续跑后会沿用旧的派生文件，丢掉新增的 bin
             source_path = joinpath(filedir, source_file)
-            if !isfile(source_path)
-                verbose && println("  未找到源文件 $(source_file)，尝试生成相关派生文件...")
+            if source_file == "cdw_k.bin" && isfile(joinpath(filedir, "nn_k.bin"))
+                create_cdw_from_nn("nn_k.bin", "cdw_k.bin", filedir, filedir; verbose=false)
+            elseif source_file == "cdwpair_k.bin" || !isfile(source_path)
+                verbose && println("  正在由原始 bin 生成 $(source_file) 及相关派生文件...")
                 cdwpair_k_files_generation(filedir; verbose=false)
             end
 
